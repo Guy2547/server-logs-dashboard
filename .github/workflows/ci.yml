@@ -20,13 +20,13 @@ jobs:
       - name: Run tests
         run: npm test --if-preesent
 
-  security:
+  security-scan:
     name: CodeQL Security Scanning
     runs-on: ubuntu_lastest
     permissions:
       security-events: write
       steps:
-      -namee: Checkout code
+      -name: Checkout code
         uses: actions/checkout@v4
       - name: Initialize CodeQL
         Uses: github/codeql-action/init@v3
