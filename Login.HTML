@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <title>Login System</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+    
+    <style>
+        :root {
+            --bg: #0f172a;
+            --panel: rgba(255,255,255,0.95);
+            --text: #111827;
+            --muted: #64748b;
+            --accent: #24627c;
+            --accent-dark: #1e5368;
+            --border: rgba(148,163,184,0.25);
+            --shadow: 0 24px 80px rgba(15,23,42,0.35);
+            --danger-bg: #fef2f2;
+            --danger-text: #ef4444;
+            --danger-border: #fca5a5;
+        }
+
+        * { box-sizing: border-box; }
+        html, body { margin: 0; min-height: 100%; }
+
+        body {
+            font-family: 'IBM Plex Sans Thai', 'Inter', system-ui, sans-serif;
+            color: var(--text);
+            background: radial-gradient(circle at top left, rgba(56,189,248,0.22), transparent 25%),
+                        linear-gradient(180deg, #0f172a 0%, #020617 100%);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 24px;
+        }
+
+        .login-card {
+            width: min(420px, 100%);
+            background: var(--panel);
+            border: 1px solid var(--border);
+            border-radius: 24px;
+            padding: 40px 32px;
+            box-shadow: var(--shadow);
+            text-align: center;
+        }
+
+        .login-card h2 { margin: 0 0 12px; font-size: 1.8rem; letter-spacing: -0.02em; }
+        .login-card p { margin: 0 0 24px; color: var(--muted); line-height: 1.6; font-size: 0.95rem; }
+
+        .input-group { text-align: left; margin-bottom: 18px; }
+        .input-group label { display: block; margin-bottom: 8px; font-size: 0.95rem; color: var(--muted); font-weight: 500; }
+
+        input {
+            width: 100%;
+            padding: 14px 16px;
+            border-radius: 12px;
+            border: 1px solid #cbd5e1;
+            background: #f8fafc;
+            color: #0f172a;
+            font-size: 1rem;
+            font-family: inherit;
+            transition: border-color 0.2s;
+        }
+        
+        input:focus {
+            outline: none;
+            border-color: var(--accent);
+            background: #ffffff;
+        }
+
+        /* 🌟 กล่องข้อความแจ้งเตือน Error */
+        .error-message {
+            display: none;
+            background-color: var(--danger-bg);
+            color: var(--danger-text);
+            border: 1px solid var(--danger-border);
+            padding: 12px;
+            border-radius: 12px;
+            margin-bottom: 18px;
+            font-size: 0.9rem;
+            text-align: left;
+            animation: shake 0.4s ease-in-out;
+        }
+
+        button {
+            width: 100%;
+            padding: 14px 16px;
+            margin-top: 8px;
+            background-color: var(--accent);
+            color: white;
+            border: none;
+            border-radius: 12px;
+            cursor: pointer;
+            font-size: 1.05rem;
+            font-weight: 600;
+            font-family: inherit;
+            transition: background-color 0.2s, transform 0.1s;
+        }
+
+        button:hover:not(:disabled) { background-color: var(--accent-dark); }
+        button:active:not(:disabled) { transform: scale(0.98); }
+        button:disabled { background-color: #94a3b8; cursor: not-allowed; }
+
+        /* อนิเมชั่นตอนสั่นเวลาพิมพ์ผิด */
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-5px); }
+            50% { transform: translateX(5px); }
+            75% { transform: translateX(-5px); }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="login-card">
+        <h2>เข้าสู่ระบบdata707</h2>
+        <p>กรุณาใส่ข้อมูลประจำตัวเพื่อเข้าสู่ระบบจัดการบันทึกเซิร์ฟเวอร์</p>
+
+        <div id="errorMessage" class="error-message"></div>
+
+        <div class="input-group">
+            <label for="userId">USER ID</label>
+            <input type="text" id="userId" placeholder="ใส่รหัสพนักงานของคุณ">
+        </div>
+
+        <div class="input-group">
+            <label for="password">รหัสผ่าน</label>
+            <input type="password" id="password" placeholder="ใส่รหัสผ่าน">
+        </div>
+
+        <button type="button" id="loginBtn" onclick="handleLogin()">เข้าสู่ระบบ</button>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            if (localStorage.getItem('u_name') && localStorage.getItem('u_dept')) {
+                window.location.href = 'dashboard.html';
+            }
+            
+            // ทำให้กด Enter เพื่อล็อคอินได้
+            document.addEventListener('keypress', function (e) {
+                if (e.key === 'Enter') handleLogin();
+            });
+        });
+
+        function showError(message) {
+            const errorDiv = document.getElementById('errorMessage');
+            errorDiv.innerText = message;
+            errorDiv.style.display = 'block';
+            
+            // ทำให้กล่องสั่นทุกครั้งที่มี Error ใหม่
+            errorDiv.style.animation = 'none';
+            setTimeout(() => errorDiv.style.animation = 'shake 0.4s ease-in-out', 10);
+        }
+
+        async function handleLogin() {
+            const userId = document.getElementById('userId').value.trim();
+            const password = document.getElementById('password').value;
+            const errorDiv = document.getElementById('errorMessage');
+            const loginBtn = document.getElementById('loginBtn');
+
+            // เคลียร์ Error เก่า
+            errorDiv.style.display = 'none';
+
+            if (!userId || !password) {
+                showError('⚠️ กรุณากรอก USER ID และรหัสผ่านให้ครบถ้วน');
+                return;
+            }
+
+            // 🌟 เปลี่ยนปุ่มเป็นสถานะกำลังโหลด
+            loginBtn.innerText = 'กำลังตรวจสอบ...';
+            loginBtn.disabled = true;
+
+            try {
+                const res = await axios.post('http://localhost:3000/login', {
+                    USER_ID: userId,
+                    PASSWORD: password
+                });
+                
+                const data = res.data;
+
+                localStorage.setItem('u_id', data.user.id);
+                localStorage.setItem('u_name', data.user.name);
+                localStorage.setItem('u_dept', data.user.dept);
+                localStorage.setItem('u_ip', data.session.ip);
+                localStorage.setItem('u_login_time', data.session.loginTime);
+
+                // เปลี่ยนปุ่มเป็นสีเขียวตอนสำเร็จ
+                loginBtn.style.backgroundColor = '#22c55e';
+                loginBtn.innerText = 'เข้าสู่ระบบสำเร็จ! กำลังเปลี่ยนหน้า...';
+                
+                // หน่วงเวลา 0.5 วินาทีให้ผู้ใช้เห็นว่าสำเร็จ ก่อนเด้งไปหน้า Dashboard
+                setTimeout(() => {
+                    window.location.href = 'dashboard.html';
+                }, 500);
+
+            } catch (error) {
+                // 🌟 คืนค่าปุ่มกลับมาเหมือนเดิม
+                loginBtn.innerText = 'เข้าสู่ระบบ';
+                loginBtn.disabled = false;
+                
+                // จัดการ Error
+                if (error.response) {
+                    if (error.response.status === 404) {
+                        showError("❌ ไม่พบ USER ID นี้ในระบบ");
+                    } else if (error.response.status === 401) {
+                        showError("❌ รหัสผ่านไม่ถูกต้อง กรุณาลองใหม่อีกครั้ง");
+                    } else {
+                        showError("⚠️ เกิดข้อผิดพลาดจากเซิร์ฟเวอร์");
+                    }
+                } else {
+                    showError("🔌 ไม่สามารถเชื่อมต่อฐานข้อมูลได้ (ตรวจสอบ Node.js)");
+                }
+            }
+        }
+    </script>
+</body>
+</html>

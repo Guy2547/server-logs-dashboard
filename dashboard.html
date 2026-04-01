@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <meta charset="UTF-8">
+    <title>Database Explorer - Management System</title>
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+    <style>
+        .loading-overlay {
+    position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+    background: rgba(6, 11, 22, 0.8); backdrop-filter: blur(4px);
+    z-index: 9999; display: flex; flex-direction: column;
+    justify-content: center; align-items: center; color: white;
+    }
+    .spinner {
+    border: 4px solid rgba(255, 255, 255, 0.1);
+    border-top: 4px solid var(--primary);
+    border-radius: 50%; width: 50px; height: 50px;
+    animation: spin 1s linear infinite; margin-bottom: 16px;
+    }
+@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        .query-status {
+    font-family: 'JetBrains Mono', 'Fira Code', monospace;
+                }
+        :root {
+            --bg: #060b16;
+            --surface: rgba(15, 23, 42, 0.88);
+            --surface-strong: rgba(15, 23, 42, 0.98);
+            --surface-soft: rgba(15, 23, 42, 0.72);
+            --text: #e2e8f0;
+            --muted: #94a3b8;
+            --primary: #38bdf8;
+            --primary-strong: #0ea5e9;
+            --success: #22c55e;
+            --danger: #f87171;
+            --border: rgba(148, 163, 184, 0.14);
+            --shadow: 0 24px 80px rgba(0, 0, 0, 0.35);
+        }
+        * { box-sizing: border-box; }
+        body {
+            font-family: 'IBM Plex Sans Thai', 'Inter', system-ui, sans-serif;
+            margin: 0;
+            height: 100vh;
+            background: radial-gradient(circle at top right, rgba(56, 189, 248, 0.16), transparent 22%),
+                        radial-gradient(circle at bottom left, rgba(34, 197, 94, 0.12), transparent 24%),
+                        linear-gradient(180deg, #020617 0%, #090d1a 100%);
+            color: var(--text);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        .toolbar {
+            background: rgba(15, 23, 42, 0.98);
+            padding: 18px 28px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid rgba(148, 163, 184, 0.12);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+        }
+        .toolbar .brand { display: flex; flex-direction: column; gap: 6px; }
+        .toolbar .brand strong { font-size: 1rem; letter-spacing: 0.04em; color: var(--primary); }
+        .toolbar .brand span { color: var(--muted); font-size: 0.9rem; }
+        .toolbar .toolbar-meta { display: flex; align-items: center; gap: 18px; flex-wrap: wrap; }
+        .toolbar .meta-pill { color: #cbd5e1; background: rgba(56, 189, 248, 0.12); border: 1px solid rgba(56, 189, 248, 0.18); padding: 8px 12px; border-radius: 999px; font-size: 0.85rem; }
+        .btn-logout { background: var(--danger); color: white; border: none; padding: 10px 16px; border-radius: 999px; cursor: pointer; font-size: 0.95rem; transition: transform 0.2s ease, background-color 0.2s ease; }
+        .btn-logout:hover { background: #ef4444; transform: translateY(-1px); }
+        .container { display: flex; flex: 1; overflow: hidden; }
+        .sidebar { width: 260px; min-width: 220px; background: rgba(15, 23, 42, 0.96); border-right: 1px solid rgba(148, 163, 184, 0.12); padding: 24px 18px; display: flex; flex-direction: column; gap: 18px; }
+        .sidebar .section-title { font-size: 0.75rem; letter-spacing: 0.18em; text-transform: uppercase; color: var(--muted); margin-bottom: 12px; }
+        .tree-item { padding: 14px 14px; color: #cbd5e1; cursor: pointer; border-radius: 14px; display: flex; align-items: center; gap: 10px; font-size: 0.95rem; transition: background 0.2s ease, color 0.2s ease; }
+        .tree-item:hover { background: rgba(56, 189, 248, 0.12); color: white; }
+        .tree-item.active { background: rgba(56, 189, 248, 0.18); color: white; }
+        .content { flex: 1; display: flex; flex-direction: column; gap: 20px; padding: 24px 28px; overflow-y: auto; }
+        .page-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 20px; }
+        .page-title h1 { margin: 0; font-size: clamp(1.75rem, 2.5vw, 2.5rem); letter-spacing: -0.04em; }
+        .page-title p { margin: 12px 0 0; color: var(--muted); line-height: 1.75; max-width: 640px; }
+        .status-pill { color: var(--primary); background: rgba(56, 189, 248, 0.14); border: 1px solid rgba(56, 189, 248, 0.24); padding: 12px 18px; border-radius: 999px; font-weight: 600; white-space: nowrap; }
+        .panel { background: var(--surface); border: 1px solid var(--border); border-radius: 24px; padding: 24px; box-shadow: var(--shadow); }
+        .query-status { color: var(--muted); margin-bottom: 18px; font-size: 0.92rem; line-height: 1.6; background: rgba(15, 23, 42, 0.9); border: 1px solid rgba(56, 189, 248, 0.12); border-radius: 18px; padding: 18px 20px; font-family: 'JetBrains Mono', 'Fira Code', monospace; }
+        table { width: 100%; border-collapse: collapse; background: transparent; font-size: 0.94rem; }
+        th, td { padding: 14px 16px; text-align: left; vertical-align: middle; }
+        th { background: rgba(15, 23, 42, 0.9); color: #cbd5e1; font-weight: 600; letter-spacing: 0.01em; border-bottom: 1px solid rgba(148, 163, 184, 0.12); }
+        td { background: rgba(15, 23, 42, 0.76); color: #e2e8f0; border-bottom: 1px solid rgba(148, 163, 184, 0.08); }
+        tr:nth-child(even) td { background: rgba(15, 23, 42, 0.62); }
+        tr:hover td { background: rgba(56, 189, 248, 0.08); }
+        .btn-delete { background: transparent; color: var(--danger); border: 1px solid rgba(248, 113, 113, 0.35); padding: 8px 12px; cursor: pointer; font-size: 0.85rem; border-radius: 999px; transition: background 0.2s ease, transform 0.2s ease; }
+        .btn-delete:hover { background: rgba(248, 113, 113, 0.16); transform: translateY(-1px); }
+        .access-denied { text-align: center; margin: 0 auto; max-width: 720px; color: #f8b4b4; background: rgba(135, 23, 43, 0.16); border: 1px solid rgba(248, 113, 113, 0.18); border-radius: 24px; padding: 40px 32px; }
+        .access-denied h2 { margin: 0 0 12px; color: #fee2e2; font-size: 1.55rem; }
+        .access-denied p { margin: 10px 0; color: var(--muted); line-height: 1.8; }
+        @media (max-width: 980px) { .container { flex-direction: column; } .sidebar { width: 100%; min-width: auto; order: 2; } .content { order: 1; } }
+        @media (max-width: 680px) { .toolbar { flex-direction: column; align-items: flex-start; gap: 14px; } .page-header { flex-direction: column; } .status-pill { width: fit-content; } }
+    </style>
+</head>
+<body>
+
+    <div class="toolbar">
+        <div class="brand">
+            <strong>Server Logs Dashboard</strong>
+            <span>ตรวจสอบบันทึกเซิร์ฟเวอร์และจัดการเหตุการณ์ได้อย่างรวดเร็ว</span>
+        </div>
+        <div id="loadingOverlay" class="loading-overlay" style="display: none;">
+    <div class="spinner"></div>
+    <p>กำลังเชื่อมต่อฐานข้อมูล...</p>
+        </div>
+        <div class="toolbar-meta">
+            <div class="meta-pill">SERVER: 127.0.0.1:1521/XE</div>
+            <div class="meta-pill">USER: <span id="displayUser"></span></div>
+            <button class="btn-logout" onclick="logout()">Disconnect</button>
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="sidebar">
+            <div class="section-title">SCHEMAS / TABLES</div>
+            <div class="tree-item" data-view="users">📁 USERS</div>
+            <div class="tree-item active" data-view="logs">📂 LOG_ACTIVITY</div>
+            <div class="tree-item" data-view="system">📁 SYSTEM_CONFIG</div>
+        </div>
+
+        <div class="content">
+            <div class="page-header">
+                <div class="page-title">
+                    <h1>LOG ACTIVITY</h1>
+                    <p>ดูบันทึกเหตุการณ์ล่าสุดจากระบบและติดตามการใช้งานของผู้ใช้ในฐานข้อมูล</p>
+                </div>
+                <div class="status-pill">Admin Dashboard</div>
+            </div>
+
+            <div id="adminPanel" class="panel" style="display: none;">
+                <div class="query-status" id="queryStatus">
+                    -- รอการเชื่อมต่อฐานข้อมูล...
+                </div>
+                <div style="max-height: 60vh; overflow-y: auto;">
+                    <table>
+                        <thead id="tableHeader">
+                            <tr>
+                                </tr>
+                        </thead>
+                        <tbody id="tableBody"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div id="userPanel" class="panel access-denied" style="display: none;">
+                <h2>🚫 ORA-01031: insufficient privileges</h2>
+                <p>User <strong><span id="uName"></span></strong> lacks permission to view the tables.</p>
+                <p>Please contact your Database Administrator (DBA) for access.</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const userName = localStorage.getItem('u_name');
+        const userDept = localStorage.getItem('u_dept');
+
+        if (!userName) {
+            window.location.href = 'login.html';
+        } else {
+            document.getElementById('displayUser').innerText = `${userName} (${userDept})`;
+            document.getElementById('uName').innerText = userName;
+
+            if (userDept.toLowerCase() === 'admin') {
+                document.getElementById('adminPanel').style.display = 'block';
+                setupViewSwitcher();
+                loadLogs(); 
+            } else {
+                document.getElementById('userPanel').style.display = 'block';
+            }
+        }
+
+        function setupViewSwitcher() {
+            const items = document.querySelectorAll('.tree-item');
+            items.forEach(item => {
+                item.addEventListener('click', () => {
+                    const view = item.dataset.view;
+                    items.forEach(i => i.classList.toggle('active', i === item));
+                    
+                    const pageTitleH1 = document.querySelector('.page-title h1');
+                    const pageTitleP = document.querySelector('.page-title p');
+
+                    if (view === 'users') {
+                        pageTitleH1.innerText = 'SYSTEM USERS';
+                        pageTitleP.innerText = 'รายชื่อผู้ใช้งานทั้งหมดในระบบ และแผนกที่สังกัด';
+                        loadUsers();
+                    } else if (view === 'logs') {
+                        pageTitleH1.innerText = 'LOG ACTIVITY';
+                        pageTitleP.innerText = 'ดูบันทึกเหตุการณ์ล่าสุดจากระบบและติดตามการใช้งานของผู้ใช้ในฐานข้อมูล';
+                        loadLogs();
+                    } else {
+                        pageTitleH1.innerText = 'SYSTEM CONFIG';
+                        pageTitleP.innerText = 'การตั้งค่าระบบและตัวแปรต่างๆ';
+                        showSystemPlaceholder();
+                    }
+                });
+            });
+        }
+
+        function setTableHeaders(columns) {
+            const header = document.getElementById('tableHeader');
+            const tr = document.createElement('tr');
+            columns.forEach(col => {
+                const th = document.createElement('th');
+                th.innerText = col;
+                tr.appendChild(th);
+            });
+            header.innerHTML = '';
+            header.appendChild(tr);
+        }
+
+        function showSystemPlaceholder() {
+            document.getElementById('queryStatus').innerHTML = '-- System configuration view not yet implemented.';
+            document.getElementById('tableHeader').innerHTML = '';
+            document.getElementById('tableBody').innerHTML = '<tr><td colspan="10" style="padding: 24px; color: var(--muted); text-align: center;">Coming soon: system configuration explorer.</td></tr>';
+        }
+
+        // 🌟 ใช้ Axios ดึงข้อมูล Logs
+        function loadLogs() {
+            const tbody = document.getElementById('tableBody');
+            tbody.innerHTML = '<tr><td colspan="8" style="text-align: center; color: var(--muted);">กำลังโหลดข้อมูล...</td></tr>';
+            
+            setTableHeaders(['ลำดับ', 'USER_ID', 'USERNAME', 'ACTION', 'CLIENT_IP', 'STATUS', 'LOG_TIME', 'CONTROL']);
+            document.getElementById('queryStatus').innerHTML = `-- Executing: SELECT ... FROM LOG_ACTIVITY...`;
+
+            // ใช้ axios.get แทน fetch
+            axios.get('http://localhost:3000/all-logs')
+                .then(res => {
+                    const data = res.data; // Axios แปลงข้อมูลให้อัตโนมัติ
+                    document.getElementById('queryStatus').innerHTML = `-- Executing: SELECT L.LOG_ID, L.USER_ID, U.USERNAME, L.ACTION, L.CLIENT_IP, L.STATUS, TO_CHAR(L.LOG_TIME, 'DD/MM/YYYY HH24:MI') FROM LOG_ACTIVITY L LEFT JOIN USERS U ON L.USER_ID = U.USER_ID ORDER BY L.LOG_TIME DESC;<br>-- Fetched <span style="color:var(--primary)">${data.length}</span> rows.`;
+
+                    tbody.innerHTML = ''; 
+
+                    data.forEach((row, index) => {
+                        const tr = document.createElement('tr');
+                        
+                        const tdNo = document.createElement('td'); tdNo.innerText = index + 1; tr.appendChild(tdNo);
+                        const tdUserId = document.createElement('td'); tdUserId.innerText = row.USER_ID || '-'; tr.appendChild(tdUserId);
+                        const tdUserName = document.createElement('td'); tdUserName.innerText = row.USERNAME || '-'; tr.appendChild(tdUserName);
+                        const tdAction = document.createElement('td'); tdAction.innerText = row.ACTION || '-'; tr.appendChild(tdAction);
+                        const tdIp = document.createElement('td'); tdIp.innerText = row.CLIENT_IP || '-'; tr.appendChild(tdIp);
+                        const tdStatus = document.createElement('td'); tdStatus.innerText = row.STATUS || '-'; tr.appendChild(tdStatus);
+                        const tdTime = document.createElement('td'); tdTime.innerText = row.LOG_TIME || '-'; tr.appendChild(tdTime);
+
+                        const actionTd = document.createElement('td');
+                        actionTd.innerHTML = `<button class="btn-delete" onclick="deleteRecord(${row.LOG_ID})">DELETE</button>`;
+                        tr.appendChild(actionTd);
+                        
+                        tbody.appendChild(tr);
+                    });
+                })
+                .catch(err => {
+                    console.error('Axios Error:', err);
+                    tbody.innerHTML = '<tr><td colspan="8" style="text-align: center; color: var(--danger);">❌ เกิดข้อผิดพลาด ไม่สามารถดึงข้อมูลได้</td></tr>';
+                });
+        }
+
+        //  Axios Get Users
+        function loadUsers() {
+            const tbody = document.getElementById('tableBody');
+            tbody.innerHTML = '<tr><td colspan="3" style="text-align: center; color: var(--muted);">กำลังโหลดข้อมูล...</td></tr>';
+            
+            setTableHeaders(['USER_ID', 'USERNAME', 'DEPARTMENT']);
+            document.getElementById('queryStatus').innerHTML = `-- Executing: SELECT USER_ID, USERNAME, DEPARTMENT FROM USERS ORDER BY USER_ID;`;
+
+            //  axios.get 
+            axios.get('http://localhost:3000/all-users')
+                .then(res => {
+                    const data = res.data; // Axios แปลงข้อมูลให้อัตโนมัติ
+                    document.getElementById('queryStatus').innerHTML = `-- Executing: SELECT USER_ID, USERNAME, DEPARTMENT FROM USERS ORDER BY USER_ID;<br>-- Fetched <span style="color:var(--primary)">${data.length}</span> rows.`;
+
+                    tbody.innerHTML = ''; 
+
+                    data.forEach(row => {
+                        const tr = document.createElement('tr');
+                        
+                        if (Array.isArray(row)) {
+                            tr.innerHTML = `
+                                <td>${row[0] || '-'}</td>
+                                <td>${row[1] || '-'}</td>
+                                <td>${row[2] || '-'}</td>
+                            `;
+                        } else {
+                            tr.innerHTML = `
+                                <td>${row.USER_ID || '-'}</td>
+                                <td>${row.USERNAME || '-'}</td>
+                                <td>${row.DEPARTMENT || '-'}</td>
+                            `;
+                        }
+                        
+                        tbody.appendChild(tr);
+                    });
+                })
+                .catch(err => {
+                    console.error('Axios Error:', err);
+                    tbody.innerHTML = '<tr><td colspan="3" style="text-align: center; color: var(--danger);">❌ เกิดข้อผิดพลาด ไม่สามารถดึงข้อมูลได้</td></tr>';
+                });
+        }
+
+        // 🌟 ใช้ Axios ลบข้อมูล
+        async function deleteRecord(logId) {
+            if (!confirm(`ยืนยันการลบข้อมูล LOG_ID: ${logId} ใช่หรือไม่?`)) return;
+
+            try {
+                // Syntax การส่ง body ผ่าน DELETE ของ axios จะใช้ config object data: {}
+                const res = await axios.delete(`http://localhost:3000/delete-log/${logId}`, {
+                    data: { dept: userDept }
+                });
+
+                // ถ้าลบสำเร็จ (Status 2xx)
+                alert('ลบข้อมูลสำเร็จ');
+                loadLogs(); 
+            } catch (error) {
+                if (error.response) {
+                    alert('Error: ' + (error.response.data.message || 'เกิดข้อผิดพลาดในการลบ'));
+                } else {
+                    alert('ไม่สามารถเชื่อมต่อ Server ได้');
+                }
+            }
+        }
+
+        function logout() {
+            localStorage.clear();
+            window.location.href = 'login.html';
+        }
+    </script>
+</body>
+</html>
