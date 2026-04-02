@@ -2,13 +2,16 @@ const express = require('express');
 const oracledb = require('oracledb');
 const cors = require('cors');
 const app = express();
+const dotenv = require('dotenv');
+dotenv.config();
 
 app.use(cors());
 app.use(express.json());
 
+
 const dbConfig = {
-    user: 'Serverlogs',
-    password: '0987',
+    user: 'DB_USERNAME',
+    password: 'DB_PASSWORD',
     connectString: 'host.docker.internal:1521/XE'
 };
 
@@ -200,7 +203,7 @@ app.get('/all-users', async (req, res) => {
     // เปิดหน้าจอหมุนๆ โหลดข้อมูล
     document.getElementById('loadingOverlay').style.display = 'flex'; 
 
-    axios.get('http://localhost:3000/all-logs')
+    axios.get(`${process.env.DATAURL}/all-logs`)
         .then(res => {
             // ข้อมูลมาแล้ว ปิดหน้าจอหมุนๆ
             document.getElementById('loadingOverlay').style.display = 'none'; 
@@ -214,7 +217,7 @@ app.get('/all-users', async (req, res) => {
         });
 }
 if (process.env.NODE_ENV !== 'test') {
-    app.listen(3000, () => console.log('🚀 Server running on port 3000'));
+    app.listen(3000, () => console.log(`🚀  ${process.env.NODE_ENV} Server running on port 3000`));
 }
 
 module.exports = app;
