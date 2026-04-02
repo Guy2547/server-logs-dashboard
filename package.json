@@ -4,7 +4,7 @@
   "description": "",
   "main": "API GET.js",
   "scripts": {
-    "test": "echo 'All tests passed!'"
+    "test": "jest"
   },
   "keywords": [],
   "author": "",

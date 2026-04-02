@@ -13,11 +13,11 @@ const dbConfig = {
 };
 
 function getClientIp(req) {
-    const forwarded = req.headers['x-forwarded-for'];
-    if (forwarded) {
-        return forwarded.split(',')[0].trim();
-    }
-    return req.ip || req.connection?.remoteAddress || 'unknown';
+   const ipRegex = /^(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/;
+   
+   if (clientIp && !ipRegex.test(clientIp)) {
+       return res.status(400).json({ message: 'รูปแบบ IP Address ไม่ถูกต้อง' });
+   }
 }
 
 // --- Login API ---
