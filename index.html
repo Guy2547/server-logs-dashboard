@@ -202,7 +202,6 @@
                 loginBtn.innerText = 'เข้าสู่ระบบ';
                 loginBtn.disabled = false;
                 
-                // จัดการ Error
                 if (error.response) {
                     if (error.response.status === 404) {
                         showError("❌ ไม่พบ USER ID นี้ในระบบ");
