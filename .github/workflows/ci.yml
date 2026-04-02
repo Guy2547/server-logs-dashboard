@@ -1,11 +1,11 @@
-name: CI and Security Checks
-#1
+name: CI and Security Scan
+
 on:
   push:
-    branches: ["main","develop"]
+    branches: [ "main", "develop" ]
 
 jobs:
-  tests:
+  test:
     name: Run Node.js Tests
     runs-on: ubuntu-latest
     steps:
@@ -18,19 +18,19 @@ jobs:
       - name: Install dependencies
         run: npm install
       - name: Run tests
-        run: npm test --if-preesent
+        run: npm test --if-present 
 
   security-scan:
-    name: CodeQL Security Scanning
-    runs-on: ubuntu_lastest
+    name: CodeQL Security Scan
+    runs-on: ubuntu-latest
     permissions:
       security-events: write
-      steps:
-      -name: Checkout code
-        uses:actions/checkout@v4
-      - name:Initialize CodeQL
-        Uses:github/codeql-action/init@v3
-        with:languages:javascript
-      - name:perform CodeQL Analysis
-        uses:github/codeql-action/analyze@v3'
-        
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: javascript
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v3
