@@ -1,5 +1,5 @@
 const express = require('express');
-const oracledb = require('oracledb');
+const { Pool } = require('pg');
 const cors = require('cors');
 const app = express();
 const dotenv = require('dotenv');
@@ -8,11 +8,9 @@ dotenv.config();
 app.use(cors());
 app.use(express.json());
 
-const dbConfig = {
-    user: process.env.DB_USERNAME || 'DB_USERNAME',
-    password: process.env.DB_PASSWORD || 'DB_PASSWORD',
-    connectString: process.env.DB_CONNECT_STRING || 'host.docker.internal:1521/XE'
-};
+const pool = new Pool({
+    connectionString: process.env.DATABASE_URL
+});
 
 function getClientIp(req) {
     return req.headers['x-forwarded-for']?.split(',')[0].trim() || req.socket?.remoteAddress || req.ip || '127.0.0.1';
@@ -21,7 +19,7 @@ function getClientIp(req) {
 // --- Login API ---
 app.post('/login', async (req, res) => {
     const { USER_ID, PASSWORD } = req.body;
-    let connection;
+    const client = await pool.connect();
     const clientIp = getClientIp(req);
     const loginTime = new Date().toLocaleString('th-TH', { timeZone: 'Asia/Bangkok' });
 
@@ -33,49 +31,35 @@ app.post('/login', async (req, res) => {
     }
 
     try {
-        connection = await oracledb.getConnection(dbConfig);
-
         const authSql = `SELECT USERNAME, DEPARTMENT FROM USERS
-                         WHERE USER_ID = :id AND PASSWORD = :pw AND STATUS = 'ACTIVE'`;
-        const authResult = await connection.execute(authSql, { id: USER_ID, pw: PASSWORD });
+                         WHERE USER_ID = $1 AND PASSWORD = $2 AND STATUS = 'ACTIVE'`;
+        const authResult = await client.query(authSql, [USER_ID, PASSWORD]);
 
         if (authResult.rows.length > 0) {
-            const [username, dept] = authResult.rows[0];
+            const { username, department } = authResult.rows[0];
             
-            await connection.execute(
+            await client.query(
                 `INSERT INTO LOG_ACTIVITY (USER_ID, ACTION, CLIENT_IP, STATUS, LOG_TIME)
-                 VALUES (:id, :action, :ip, :status, SYSTIMESTAMP)`,
-                {
-                    id: USER_ID,
-                    action: 'LOGIN_SUCCESS',
-                    ip: clientIp,
-                    status: 'SUCCESS'
-                },
-                { autoCommit: true }
+                 VALUES ($1, $2, $3, $4, NOW())`,
+                [USER_ID, 'LOGIN_SUCCESS', clientIp, 'SUCCESS']
             );
 
             return res.json({
                 status: 'success',
-                user: { id: USER_ID, name: username, dept: dept },
+                user: { id: USER_ID, name: username, dept: department },
                 session: { ip: clientIp, loginTime }
             });
         }
 
-        const idResult = await connection.execute(
-            `SELECT USERNAME FROM USERS WHERE USER_ID = :id`,
-            { id: USER_ID }
+        const idResult = await client.query(
+            `SELECT USERNAME FROM USERS WHERE USER_ID = $1`,
+            [USER_ID]
         );
         
-        await connection.execute(
+        await client.query(
             `INSERT INTO LOG_ACTIVITY (USER_ID, ACTION, CLIENT_IP, STATUS, LOG_TIME)
-             VALUES (:id, :action, :ip, :status, SYSTIMESTAMP)`,
-            {
-                id: USER_ID,
-                action: 'LOGIN_FAILED',
-                ip: clientIp,
-                status: idResult.rows.length > 0 ? 'FAIL' : 'NOT_FOUND'
-            },
-            { autoCommit: true }
+             VALUES ($1, $2, $3, $4, NOW())`,
+            [USER_ID, 'LOGIN_FAILED', clientIp, idResult.rows.length > 0 ? 'FAIL' : 'NOT_FOUND']
         );
 
         if (idResult.rows.length === 0) {
@@ -86,32 +70,30 @@ app.post('/login', async (req, res) => {
     } catch (err) {
         return res.status(500).json({ status: 'error', message: err.message });
     } finally {
-        if (connection) await connection.close();
+        client.release();
     }
 });
 
 // --- Logs API ---
 app.get('/all-logs', async (req, res) => {
-    let connection;
+    const client = await pool.connect();
     try {
-        connection = await oracledb.getConnection(dbConfig);
-
         const sql = `SELECT L.LOG_ID, L.USER_ID, U.USERNAME, L.ACTION, L.CLIENT_IP, L.STATUS,
-                            TO_CHAR(L.LOG_TIME, 'DD/MM/YYYY HH24:MI') AS LOG_TIME
+                            to_char(L.LOG_TIME, 'DD/MM/YYYY HH24:MI') AS LOG_TIME
                      FROM LOG_ACTIVITY L
                      LEFT JOIN USERS U ON L.USER_ID = U.USER_ID
                      ORDER BY L.LOG_TIME DESC`;
                      
-        const result = await connection.execute(sql);
+        const result = await client.query(sql);
         const logs = result.rows.map(row => {
             return {
-                LOG_ID: row[0],
-                USER_ID: row[1],
-                USERNAME: row[2] || 'Unknown',
-                ACTION: row[3],
-                CLIENT_IP: row[4],
-                STATUS: row[5],
-                LOG_TIME: row[6]
+                LOG_ID: row.log_id,
+                USER_ID: row.user_id,
+                USERNAME: row.username || 'Unknown',
+                ACTION: row.action,
+                CLIENT_IP: row.client_ip,
+                STATUS: row.status,
+                LOG_TIME: row.log_time
             };
         });
 
@@ -119,29 +101,26 @@ app.get('/all-logs', async (req, res) => {
     } catch (err) {
         return res.status(500).json({ status: 'error', message: err.message });
     } finally {
-        if (connection) await connection.close();
+        client.release();
     }
 });
 
 app.delete('/delete-log/:id', async (req, res) => {
     const logId = req.params.id;
     const { dept } = req.body;
-    let connection;
+    const client = await pool.connect();
 
     if (dept !== 'admin') {
         return res.status(403).json({ status: 'error', message: 'เฉพาะ Admin เท่านั้นที่มีสิทธิ์ลบ' });
     }
 
     try {
-        connection = await oracledb.getConnection(dbConfig);
-
-        const result = await connection.execute(
-            `DELETE FROM LOG_ACTIVITY WHERE LOG_ID = :id`,
-            { id: logId },
-            { autoCommit: true }
+        const result = await client.query(
+            `DELETE FROM LOG_ACTIVITY WHERE LOG_ID = $1`,
+            [logId]
         );
 
-        if (result.rowsAffected > 0) {
+        if (result.rowCount > 0) {
             return res.json({ status: 'success', message: 'ลบข้อมูลสำเร็จ' });
         }
 
@@ -149,53 +128,48 @@ app.delete('/delete-log/:id', async (req, res) => {
     } catch (err) {
         return res.status(500).json({ status: 'error', message: err.message });
     } finally {
-        if (connection) await connection.close();
+        client.release();
     }
 });
 
 app.post('/logs', async (req, res) => {
     const { USERID, ACTION, STATUS } = req.body;
-    let connection;
+    const client = await pool.connect();
     const clientIp = getClientIp(req);
 
     try {
-        connection = await oracledb.getConnection(dbConfig);
-
         const sql = `INSERT INTO LOG_ACTIVITY (USER_ID, ACTION, STATUS, CLIENT_IP, LOG_TIME)
-                     VALUES (:id, :action, :status, :ip, SYSDATE)`;
-        const result = await connection.execute(
+                     VALUES ($1, $2, $3, $4, NOW())`;
+        const result = await client.query(
             sql,
-            { id: USERID, action: ACTION, status: STATUS, ip: clientIp },
-            { autoCommit: true }
+            [USERID, ACTION, STATUS, clientIp]
         );
 
         return res.status(201).json({
             status: 'success',
             message: 'บันทึกข้อมูล Log เรียบร้อยแล้ว',
-            rowsInserted: result.rowsAffected
+            rowsInserted: result.rowCount
         });
     } catch (err) {
         return res.status(500).json({ status: 'error', message: err.message });
     } finally {
-        if (connection) await connection.close();
+        client.release();
     }
 });
 
 //-USER-
 app.get('/all-users', async (req, res) => {
-    let connection;
+    const client = await pool.connect();
 
     try {
-        connection = await oracledb.getConnection(dbConfig);
-
         const sql = `SELECT USER_ID, USERNAME, DEPARTMENT FROM USERS ORDER BY USER_ID`;
-        const result = await connection.execute(sql);
+        const result = await client.query(sql);
 
         return res.status(200).json(result.rows);
     } catch (err) {
         return res.status(500).json({ status: 'error', message: err.message });
     } finally {
-        if (connection) await connection.close();
+        client.release();
     }
 });
 

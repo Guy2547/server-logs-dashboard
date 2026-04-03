@@ -108,7 +108,7 @@
     <p>กำลังเชื่อมต่อฐานข้อมูล...</p>
         </div>
         <div class="toolbar-meta">
-            <div class="meta-pill">SERVER: 127.0.0.1:1521/XE</div>
+            <div class="meta-pill">SERVER: host.docker.internal:22941/raiiway</div>
             <div class="meta-pill">USER: <span id="displayUser"></span></div>
             <button class="btn-logout" onclick="logout()">Disconnect</button>
         </div>
@@ -231,7 +231,7 @@
             })
                 .then(res => {
                     const data = res.data; 
-                    document.getElementById('queryStatus').innerHTML = `-- Executing: SELECT L.LOG_ID, L.USER_ID, U.USERNAME, L.ACTION, L.CLIENT_IP, L.STATUS, TO_CHAR(L.LOG_TIME, 'DD/MM/YYYY HH24:MI') FROM LOG_ACTIVITY L LEFT JOIN USERS U ON L.USER_ID = U.USER_ID ORDER BY L.LOG_TIME DESC;<br>-- Fetched <span style="color:var(--primary)">${data.length}</span> rows.`;
+                    document.getElementById('queryStatus').innerHTML = `-- Executing: SELECT L.LOG_ID, L.USER_ID, U.USERNAME, L.ACTION, L.CLIENT_IP, L.STATUS, to_char(L.LOG_TIME, 'DD/MM/YYYY HH24:MI') FROM LOG_ACTIVITY L LEFT JOIN USERS U ON L.USER_ID = U.USER_ID ORDER BY L.LOG_TIME DESC;<br>-- Fetched <span style="color:var(--primary)">${data.length}</span> rows.`;
 
                     tbody.innerHTML = ''; 
 
