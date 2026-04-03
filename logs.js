@@ -8,9 +8,60 @@ dotenv.config();
 app.use(cors());
 app.use(express.json());
 
-const pool = new Pool({
-    connectionString: process.env.DATABASE_URL
-});
+// Environment-specific configuration
+const config = {
+  development: {
+    port: process.env.PORT ? parseInt(process.env.PORT, 10) : undefined,
+    database: {
+      connectionString: process.env.DATABASE_URL,
+      host: process.env.DB_HOST,
+      port: process.env.DB_PORT ? parseInt(process.env.DB_PORT, 10) : undefined,
+      user: process.env.DB_USER,
+      password: process.env.DB_PASSWORD,
+      database: process.env.DB_NAME,
+      ssl: process.env.DB_SSL === 'true',
+      max: process.env.DB_POOL_MAX ? parseInt(process.env.DB_POOL_MAX, 10) : undefined,
+      idleTimeoutMillis: process.env.DB_IDLE_TIMEOUT_MS ? parseInt(process.env.DB_IDLE_TIMEOUT_MS, 10) : undefined
+    }
+  },
+  production: {
+    port: process.env.PORT ? parseInt(process.env.PORT, 10) : undefined,
+    database: {
+      connectionString: process.env.DATABASE_URL,
+      host: process.env.DB_HOST,
+      port: process.env.DB_PORT ? parseInt(process.env.DB_PORT, 10) : undefined,
+      user: process.env.DB_USER,
+      password: process.env.DB_PASSWORD,
+      database: process.env.DB_NAME,
+      ssl: process.env.DB_SSL === 'true',
+      max: process.env.DB_POOL_MAX ? parseInt(process.env.DB_POOL_MAX, 10) : undefined,
+      idleTimeoutMillis: process.env.DB_IDLE_TIMEOUT_MS ? parseInt(process.env.DB_IDLE_TIMEOUT_MS, 10) : undefined
+    }
+  },
+  test: {
+    port: process.env.PORT ? parseInt(process.env.PORT, 10) : undefined,
+    database: {
+      connectionString: process.env.DATABASE_URL,
+      host: process.env.DB_HOST,
+      port: process.env.DB_PORT ? parseInt(process.env.DB_PORT, 10) : undefined,
+      user: process.env.DB_USER,
+      password: process.env.DB_PASSWORD,
+      database: process.env.DB_NAME,
+      ssl: process.env.DB_SSL === 'true',
+      max: process.env.DB_POOL_MAX ? parseInt(process.env.DB_POOL_MAX, 10) : undefined,
+      idleTimeoutMillis: process.env.DB_IDLE_TIMEOUT_MS ? parseInt(process.env.DB_IDLE_TIMEOUT_MS, 10) : undefined
+    }
+  }
+};
+
+const env = process.env.NODE_ENV || 'development';
+const currentConfig = config[env];
+
+if (!currentConfig) {
+  throw new Error(`Invalid NODE_ENV: ${env}. Supported: development, production, test`);
+}
+
+const pool = new Pool(currentConfig.database);
 
 function getClientIp(req) {
     return req.headers['x-forwarded-for']?.split(',')[0].trim() || req.socket?.remoteAddress || req.ip || '127.0.0.1';
@@ -173,8 +224,8 @@ app.get('/all-users', async (req, res) => {
     }
 });
 
-if (process.env.NODE_ENV !== 'test') {
-    app.listen(3000, () => console.log(`🚀  ${process.env.NODE_ENV} Server running on port 3000`));
+if (env !== 'test') {
+    app.listen(currentConfig.port, () => console.log(`🚀  ${env} Server running on port ${currentConfig.port}`));
 }
 
 module.exports = app;
