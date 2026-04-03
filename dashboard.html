@@ -217,7 +217,6 @@
             document.getElementById('tableBody').innerHTML = '<tr><td colspan="10" style="padding: 24px; color: var(--muted); text-align: center;">Coming soon: system configuration explorer.</td></tr>';
         }
 
-        // 🌟 Axios  Logs
         function loadLogs() {
             const tbody = document.getElementById('tableBody');
             tbody.innerHTML = '<tr><td colspan="8" style="text-align: center; color: var(--muted);">กำลังโหลดข้อมูล...</td></tr>';
@@ -225,8 +224,10 @@
             setTableHeaders(['ลำดับ', 'USER_ID', 'USERNAME', 'ACTION', 'CLIENT_IP', 'STATUS', 'LOG_TIME', 'CONTROL']);
             document.getElementById('queryStatus').innerHTML = `-- Executing: SELECT ... FROM LOG_ACTIVITY...`;
 
-            //  axios.get  
-            axios.get('`${process.env.PORT}/all-users`')
+            // แก้ URL ให้ยิงไปดึงข้อมูล log พร้อมส่ง Header ป้องกัน Ngrok บล็อก
+            axios.get('https://josephina-untallied-superoratorically.ngrok-free.dev/all-logs', {
+                headers: { 'ngrok-skip-browser-warning': 'true' }
+            })
                 .then(res => {
                     const data = res.data; 
                     document.getElementById('queryStatus').innerHTML = `-- Executing: SELECT L.LOG_ID, L.USER_ID, U.USERNAME, L.ACTION, L.CLIENT_IP, L.STATUS, TO_CHAR(L.LOG_TIME, 'DD/MM/YYYY HH24:MI') FROM LOG_ACTIVITY L LEFT JOIN USERS U ON L.USER_ID = U.USER_ID ORDER BY L.LOG_TIME DESC;<br>-- Fetched <span style="color:var(--primary)">${data.length}</span> rows.`;
@@ -257,7 +258,6 @@
                 });
         }
 
-        //  Axios Get Users
         function loadUsers() {
             const tbody = document.getElementById('tableBody');
             tbody.innerHTML = '<tr><td colspan="3" style="text-align: center; color: var(--muted);">กำลังโหลดข้อมูล...</td></tr>';
@@ -265,10 +265,12 @@
             setTableHeaders(['USER_ID', 'USERNAME', 'DEPARTMENT']);
             document.getElementById('queryStatus').innerHTML = `-- Executing: SELECT USER_ID, USERNAME, DEPARTMENT FROM USERS ORDER BY USER_ID;`;
 
-            //  axios.get 
-            axios.get(`${process.env.PORT}/all-users`)
+            // แก้ URL ให้ยิงไปดึงข้อมูล user
+            axios.get('https://josephina-untallied-superoratorically.ngrok-free.dev/all-users', {
+                headers: { 'ngrok-skip-browser-warning': 'true' }
+            })
                 .then(res => {
-                    const data = res.data; // Axios แปลงข้อมูลให้อัตโนมัติ
+                    const data = res.data; 
                     document.getElementById('queryStatus').innerHTML = `-- Executing: SELECT USER_ID, USERNAME, DEPARTMENT FROM USERS ORDER BY USER_ID;<br>-- Fetched <span style="color:var(--primary)">${data.length}</span> rows.`;
 
                     tbody.innerHTML = ''; 
@@ -299,17 +301,16 @@
                 });
         }
 
-        // 🌟 ใช้ Axios ลบข้อมูล
         async function deleteRecord(logId) {
             if (!confirm(`ยืนยันการลบข้อมูล LOG_ID: ${logId} ใช่หรือไม่?`)) return;
 
             try {
-                // Syntax  DELETE  axios  config object data: {}
-                const res = await axios.delete(`${process.env.PORT}/delete-log/${logId}`, {
-                    data: { dept: userDept }
+                // แก้ URL 
+                const res = await axios.delete(`https://josephina-untallied-superoratorically.ngrok-free.dev/delete-log/${logId}`, {
+                    data: { dept: userDept },
+                    headers: { 'ngrok-skip-browser-warning': 'true' }
                 });
 
-                // ถ้าลบสำเร็จ (Status 2xx)
                 alert('ลบข้อมูลสำเร็จ');
                 loadLogs(); 
             } catch (error) {

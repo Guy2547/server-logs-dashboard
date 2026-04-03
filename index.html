@@ -71,7 +71,6 @@
             background: #ffffff;
         }
 
-        /* 🌟 กล่องข้อความแจ้งเตือน Error */
         .error-message {
             display: none;
             background-color: var(--danger-bg);
@@ -104,7 +103,6 @@
         button:active:not(:disabled) { transform: scale(0.98); }
         button:disabled { background-color: #94a3b8; cursor: not-allowed; }
 
-        /* อนิเมชั่นตอนสั่นเวลาพิมพ์ผิด */
         @keyframes shake {
             0%, 100% { transform: translateX(0); }
             25% { transform: translateX(-5px); }
@@ -140,7 +138,6 @@
                 window.location.href = 'dashboard.html';
             }
             
-            // ทำให้กด Enter เพื่อล็อคอินได้
             document.addEventListener('keypress', function (e) {
                 if (e.key === 'Enter') handleLogin();
             });
@@ -151,7 +148,6 @@
             errorDiv.innerText = message;
             errorDiv.style.display = 'block';
             
-            // ทำให้กล่องสั่นทุกครั้งที่มี Error ใหม่
             errorDiv.style.animation = 'none';
             setTimeout(() => errorDiv.style.animation = 'shake 0.4s ease-in-out', 10);
         }
@@ -162,7 +158,6 @@
             const errorDiv = document.getElementById('errorMessage');
             const loginBtn = document.getElementById('loginBtn');
 
-            // เคลียร์ Error เก่า
             errorDiv.style.display = 'none';
 
             if (!userId || !password) {
@@ -170,14 +165,18 @@
                 return;
             }
 
-            // 🌟 เปลี่ยนปุ่มเป็นสถานะกำลังโหลด
             loginBtn.innerText = 'กำลังตรวจสอบ...';
             loginBtn.disabled = true;
 
             try {
-                const res = await axios.post(`${process.env.PORT}/all-users`, {
+                // แก้ไข URL เป็น Ngrok และเพิ่ม Header ข้ามหน้าจอแจ้งเตือน
+                const res = await axios.post('https://josephina-untallied-superoratorically.ngrok-free.dev/login', {
                     USER_ID: userId,
                     PASSWORD: password
+                }, {
+                    headers: {
+                        'ngrok-skip-browser-warning': 'true'
+                    }
                 });
                 
                 const data = res.data;
@@ -188,17 +187,15 @@
                 localStorage.setItem('u_ip', data.session.ip);
                 localStorage.setItem('u_login_time', data.session.loginTime);
 
-                // เปลี่ยนปุ่มเป็นสีเขียวตอนสำเร็จ
                 loginBtn.style.backgroundColor = '#22c55e';
                 loginBtn.innerText = 'เข้าสู่ระบบสำเร็จ! กำลังเปลี่ยนหน้า...';
                 
-                // หน่วงเวลา 0.5 วินาทีให้ผู้ใช้เห็นว่าสำเร็จ ก่อนเด้งไปหน้า Dashboard
+            
                 setTimeout(() => {
                     window.location.href = 'dashboard.html';
                 }, 500);
 
             } catch (error) {
-                // 🌟 คืนค่าปุ่มกลับมาเหมือนเดิม
                 loginBtn.innerText = 'เข้าสู่ระบบ';
                 loginBtn.disabled = false;
                 
@@ -211,7 +208,7 @@
                         showError("⚠️ เกิดข้อผิดพลาดจากเซิร์ฟเวอร์");
                     }
                 } else {
-                    showError("🔌 ไม่สามารถเชื่อมต่อฐานข้อมูลได้ (ตรวจสอบ Node.js)");
+                    showError("🔌 ไม่สามารถเชื่อมต่อฐานข้อมูลได้ (ตรวจสอบ Node.js และ Ngrok)");
                 }
             }
         }
