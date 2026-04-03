@@ -175,7 +175,7 @@
             loginBtn.disabled = true;
 
             try {
-                const res = await axios.post('http://localhost:3000/login', {
+                const res = await axios.post('http://localhost:3000/all-users', {
                     USER_ID: userId,
                     PASSWORD: password
                 });
@@ -202,7 +202,6 @@
                 loginBtn.innerText = 'เข้าสู่ระบบ';
                 loginBtn.disabled = false;
                 
-                // จัดการ Error
                 if (error.response) {
                     if (error.response.status === 404) {
                         showError("❌ ไม่พบ USER ID นี้ในระบบ");
