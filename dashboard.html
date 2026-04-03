@@ -226,7 +226,7 @@
             document.getElementById('queryStatus').innerHTML = `-- Executing: SELECT ... FROM LOG_ACTIVITY...`;
 
             //  axios.get  
-            axios.get('http://localhost:3000/all-logs')
+            axios.get('`${process.env.PORT}/all-users`')
                 .then(res => {
                     const data = res.data; 
                     document.getElementById('queryStatus').innerHTML = `-- Executing: SELECT L.LOG_ID, L.USER_ID, U.USERNAME, L.ACTION, L.CLIENT_IP, L.STATUS, TO_CHAR(L.LOG_TIME, 'DD/MM/YYYY HH24:MI') FROM LOG_ACTIVITY L LEFT JOIN USERS U ON L.USER_ID = U.USER_ID ORDER BY L.LOG_TIME DESC;<br>-- Fetched <span style="color:var(--primary)">${data.length}</span> rows.`;
@@ -266,7 +266,7 @@
             document.getElementById('queryStatus').innerHTML = `-- Executing: SELECT USER_ID, USERNAME, DEPARTMENT FROM USERS ORDER BY USER_ID;`;
 
             //  axios.get 
-            axios.get('http://localhost:3000/all-users')
+            axios.get(`${process.env.PORT}/all-users`)
                 .then(res => {
                     const data = res.data; // Axios แปลงข้อมูลให้อัตโนมัติ
                     document.getElementById('queryStatus').innerHTML = `-- Executing: SELECT USER_ID, USERNAME, DEPARTMENT FROM USERS ORDER BY USER_ID;<br>-- Fetched <span style="color:var(--primary)">${data.length}</span> rows.`;
@@ -305,7 +305,7 @@
 
             try {
                 // Syntax  DELETE  axios  config object data: {}
-                const res = await axios.delete(`http://localhost:3000/delete-log/${logId}`, {
+                const res = await axios.delete(`${process.env.PORT}/delete-log/${logId}`, {
                     data: { dept: userDept }
                 });
 
