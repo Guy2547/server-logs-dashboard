@@ -169,7 +169,7 @@
             loginBtn.disabled = true;
 
             try {
-                const res = await axios.post('https://server-logs-dashboard-production.up.railway.app/login', {
+                const res = await axios.post(`${process.env.Database}/login`, {
                     USER_ID: userId,
                     PASSWORD: password
                 });
