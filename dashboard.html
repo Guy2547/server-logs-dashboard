@@ -224,7 +224,7 @@
             setTableHeaders(['ลำดับ', 'USER_ID', 'USERNAME', 'ACTION', 'CLIENT_IP', 'STATUS', 'LOG_TIME', 'CONTROL']);
             document.getElementById('queryStatus').innerHTML = `-- Executing: SELECT ... FROM LOG_ACTIVITY...`;
 
-            axios.get('postgres-production-bf23.up.railway.app/all-logs', {
+            axios.get('https://postgres-production-bf23.up.railway.app/all-logs', {
                 headers: { 'ngrok-skip-browser-warning': 'true' }
             })
                 .then(res => {
@@ -264,7 +264,7 @@
             setTableHeaders(['USER_ID', 'USERNAME', 'DEPARTMENT']);
             document.getElementById('queryStatus').innerHTML = `-- Executing: SELECT user_id, username, department FROM users ORDER BY user_id;`;
 
-            axios.get('postgres-production-bf23.up.railway.app/all-users', {
+            axios.get('https://postgres-production-bf23.up.railway.app/all-users', {
                 headers: { 'ngrok-skip-browser-warning': 'true' }
             })
                 .then(res => {
@@ -303,7 +303,7 @@
             if (!confirm(`ยืนยันการลบข้อมูล LOG_ID: ${logId} ใช่หรือไม่?`)) return;
 
             try {
-                const res = await axios.delete(`postgres-production-bf23.up.railway.app/delete-log/${logId}`, {
+                const res = await axios.delete(`https://postgres-production-bf23.up.railway.app/delete-log/${logId}`, {
                     data: { dept: userDept },
                     headers: { 'ngrok-skip-browser-warning': 'true' }
                 });
