@@ -11,35 +11,7 @@ app.use(express.json());
 // Environment-specific configuration
 const config = {
   development: {
-    port: process.env.PORT ? parseInt(process.env.PORT, 10) : undefined,
-    database: {
-      connectionString: process.env.DATABASE_URL,
-      host: process.env.DB_HOST,
-      port: process.env.DB_PORT ? parseInt(process.env.DB_PORT, 10) : undefined,
-      user: process.env.DB_USER,
-      password: process.env.DB_PASSWORD,
-      database: process.env.DB_NAME,
-      ssl: process.env.DB_SSL === 'true',
-      max: process.env.DB_POOL_MAX ? parseInt(process.env.DB_POOL_MAX, 10) : undefined,
-      idleTimeoutMillis: process.env.DB_IDLE_TIMEOUT_MS ? parseInt(process.env.DB_IDLE_TIMEOUT_MS, 10) : undefined
-    }
-  },
-  production: {
-    port: process.env.PORT ? parseInt(process.env.PORT, 10) : undefined,
-    database: {
-      connectionString: process.env.DATABASE_URL,
-      host: process.env.DB_HOST,
-      port: process.env.DB_PORT ? parseInt(process.env.DB_PORT, 10) : undefined,
-      user: process.env.DB_USER,
-      password: process.env.DB_PASSWORD,
-      database: process.env.DB_NAME,
-      ssl: process.env.DB_SSL === 'true',
-      max: process.env.DB_POOL_MAX ? parseInt(process.env.DB_POOL_MAX, 10) : undefined,
-      idleTimeoutMillis: process.env.DB_IDLE_TIMEOUT_MS ? parseInt(process.env.DB_IDLE_TIMEOUT_MS, 10) : undefined
-    }
-  },
-  test: {
-    port: process.env.PORT ? parseInt(process.env.PORT, 10) : undefined,
+    port: process.env.PORT ? parseInt(process.env.PORT, 10) : 3000,
     database: {
       connectionString: process.env.DATABASE_URL,
       host: process.env.DB_HOST,
@@ -55,11 +27,7 @@ const config = {
 };
 
 const env = process.env.NODE_ENV || 'development';
-const currentConfig = config[env];
-
-if (!currentConfig) {
-  throw new Error(`Invalid NODE_ENV: ${env}. Supported: development, production, test`);
-}
+const currentConfig = config[env] || config['development'];
 
 const pool = new Pool(currentConfig.database);
 
@@ -76,22 +44,20 @@ app.post('/login', async (req, res) => {
 
     const ipRegex = /^(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/;
     
-    // Check IP Format (Allowing ::1 for localhost testing)
     if (clientIp && !ipRegex.test(clientIp) && clientIp !== '::1') {
         return res.status(400).json({ message: 'รูปแบบ IP Address ไม่ถูกต้อง' });
     }
 
     try {
-        const authSql = `SELECT USERNAME, DEPARTMENT FROM USERS
-                         WHERE USER_ID = $1 AND PASSWORD = $2 AND STATUS = 'ACTIVE'`;
+        const authSql = `SELECT USERNAME, DEPARTMENT FROM USERS WHERE USER_ID = $1 AND PASSWORD = $2 AND STATUS = 'ACTIVE'`;
         const authResult = await client.query(authSql, [USER_ID, PASSWORD]);
 
         if (authResult.rows.length > 0) {
+            // PostgreSQL รีเทิร์นค่ากลับมาเป็นตัวพิมพ์เล็ก (username, department)
             const { username, department } = authResult.rows[0];
             
             await client.query(
-                `INSERT INTO LOG_ACTIVITY (USER_ID, ACTION, CLIENT_IP, STATUS, LOG_TIME)
-                 VALUES ($1, $2, $3, $4, NOW())`,
+                `INSERT INTO LOG_ACTIVITY (USER_ID, ACTION, CLIENT_IP, STATUS, LOG_TIME) VALUES ($1, $2, $3, $4, NOW())`,
                 [USER_ID, 'LOGIN_SUCCESS', clientIp, 'SUCCESS']
             );
 
@@ -102,14 +68,10 @@ app.post('/login', async (req, res) => {
             });
         }
 
-        const idResult = await client.query(
-            `SELECT USERNAME FROM USERS WHERE USER_ID = $1`,
-            [USER_ID]
-        );
+        const idResult = await client.query(`SELECT USERNAME FROM USERS WHERE USER_ID = $1`, [USER_ID]);
         
         await client.query(
-            `INSERT INTO LOG_ACTIVITY (USER_ID, ACTION, CLIENT_IP, STATUS, LOG_TIME)
-             VALUES ($1, $2, $3, $4, NOW())`,
+            `INSERT INTO LOG_ACTIVITY (USER_ID, ACTION, CLIENT_IP, STATUS, LOG_TIME) VALUES ($1, $2, $3, $4, NOW())`,
             [USER_ID, 'LOGIN_FAILED', clientIp, idResult.rows.length > 0 ? 'FAIL' : 'NOT_FOUND']
         );
 
@@ -136,6 +98,7 @@ app.get('/all-logs', async (req, res) => {
                      ORDER BY L.LOG_TIME DESC`;
                      
         const result = await client.query(sql);
+        // แปลง Key กลับเป็นตัวพิมพ์ใหญ่ให้หน้าเว็บอ่านออก
         const logs = result.rows.map(row => {
             return {
                 LOG_ID: row.log_id,
@@ -166,41 +129,13 @@ app.delete('/delete-log/:id', async (req, res) => {
     }
 
     try {
-        const result = await client.query(
-            `DELETE FROM LOG_ACTIVITY WHERE LOG_ID = $1`,
-            [logId]
-        );
+        const result = await client.query(`DELETE FROM LOG_ACTIVITY WHERE LOG_ID = $1`, [logId]);
 
         if (result.rowCount > 0) {
             return res.json({ status: 'success', message: 'ลบข้อมูลสำเร็จ' });
         }
 
         return res.status(404).json({ status: 'error', message: 'ไม่พบข้อมูลที่ต้องการลบ' });
-    } catch (err) {
-        return res.status(500).json({ status: 'error', message: err.message });
-    } finally {
-        client.release();
-    }
-});
-
-app.post('/logs', async (req, res) => {
-    const { USERID, ACTION, STATUS } = req.body;
-    const client = await pool.connect();
-    const clientIp = getClientIp(req);
-
-    try {
-        const sql = `INSERT INTO LOG_ACTIVITY (USER_ID, ACTION, STATUS, CLIENT_IP, LOG_TIME)
-                     VALUES ($1, $2, $3, $4, NOW())`;
-        const result = await client.query(
-            sql,
-            [USERID, ACTION, STATUS, clientIp]
-        );
-
-        return res.status(201).json({
-            status: 'success',
-            message: 'บันทึกข้อมูล Log เรียบร้อยแล้ว',
-            rowsInserted: result.rowCount
-        });
     } catch (err) {
         return res.status(500).json({ status: 'error', message: err.message });
     } finally {
@@ -216,7 +151,14 @@ app.get('/all-users', async (req, res) => {
         const sql = `SELECT USER_ID, USERNAME, DEPARTMENT FROM USERS ORDER BY USER_ID`;
         const result = await client.query(sql);
 
-        return res.status(200).json(result.rows);
+        // 🌟 แก้ไขตรงนี้: แปลงข้อมูลจาก PostgreSQL (พิมพ์เล็ก) ให้เป็นพิมพ์ใหญ่ส่งไปให้หน้าบ้าน
+        const users = result.rows.map(row => ({
+            USER_ID: row.user_id,
+            USERNAME: row.username,
+            DEPARTMENT: row.department
+        }));
+
+        return res.status(200).json(users);
     } catch (err) {
         return res.status(500).json({ status: 'error', message: err.message });
     } finally {
@@ -225,7 +167,7 @@ app.get('/all-users', async (req, res) => {
 });
 
 if (env !== 'test') {
-    app.listen(currentConfig.port, () => console.log(`🚀  ${env} Server running on port ${currentConfig.port}`));
+    app.listen(currentConfig.port, () => console.log(`🚀 ${env} Server running on port ${currentConfig.port}`));
 }
 
 module.exports = app;
