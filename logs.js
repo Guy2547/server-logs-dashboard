@@ -42,22 +42,30 @@ app.post('/login', async (req, res) => {
     const clientIp = getClientIp(req);
     const loginTime = new Date().toLocaleString('th-TH', { timeZone: 'Asia/Bangkok' });
 
+    // 🌟 ดักจับ Error: เนื่องจาก user_id ใน DB เป็น serial4 (ตัวเลข) ถ้าพิมพ์ตัวอักษรมา Database จะพัง
+    if (isNaN(USER_ID)) {
+        client.release();
+        return res.status(400).json({ status: 'error', message: 'USER ID ต้องเป็นตัวเลขเท่านั้น' });
+    }
+
     const ipRegex = /^(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/;
     
     if (clientIp && !ipRegex.test(clientIp) && clientIp !== '::1') {
+        client.release();
         return res.status(400).json({ message: 'รูปแบบ IP Address ไม่ถูกต้อง' });
     }
 
     try {
-        const authSql = `SELECT USERNAME, DEPARTMENT FROM USERS WHERE USER_ID = $1 AND PASSWORD = $2 AND STATUS = 'ACTIVE'`;
+        // แก้ไข SQL เป็นตัวพิมพ์เล็กให้ตรงกับ Database
+        const authSql = `SELECT username, department FROM users WHERE user_id = $1 AND password = $2 AND status = 'ACTIVE'`;
         const authResult = await client.query(authSql, [USER_ID, PASSWORD]);
 
         if (authResult.rows.length > 0) {
-            // PostgreSQL รีเทิร์นค่ากลับมาเป็นตัวพิมพ์เล็ก (username, department)
             const { username, department } = authResult.rows[0];
             
+            // แก้ไข SQL เป็นตัวพิมพ์เล็กให้ตรงกับ Database
             await client.query(
-                `INSERT INTO LOG_ACTIVITY (USER_ID, ACTION, CLIENT_IP, STATUS, LOG_TIME) VALUES ($1, $2, $3, $4, NOW())`,
+                `INSERT INTO log_activity (user_id, action, client_ip, status, log_time) VALUES ($1, $2, $3, $4, NOW())`,
                 [USER_ID, 'LOGIN_SUCCESS', clientIp, 'SUCCESS']
             );
 
@@ -68,10 +76,10 @@ app.post('/login', async (req, res) => {
             });
         }
 
-        const idResult = await client.query(`SELECT USERNAME FROM USERS WHERE USER_ID = $1`, [USER_ID]);
+        const idResult = await client.query(`SELECT username FROM users WHERE user_id = $1`, [USER_ID]);
         
         await client.query(
-            `INSERT INTO LOG_ACTIVITY (USER_ID, ACTION, CLIENT_IP, STATUS, LOG_TIME) VALUES ($1, $2, $3, $4, NOW())`,
+            `INSERT INTO log_activity (user_id, action, client_ip, status, log_time) VALUES ($1, $2, $3, $4, NOW())`,
             [USER_ID, 'LOGIN_FAILED', clientIp, idResult.rows.length > 0 ? 'FAIL' : 'NOT_FOUND']
         );
 
@@ -91,14 +99,16 @@ app.post('/login', async (req, res) => {
 app.get('/all-logs', async (req, res) => {
     const client = await pool.connect();
     try {
-        const sql = `SELECT L.LOG_ID, L.USER_ID, U.USERNAME, L.ACTION, L.CLIENT_IP, L.STATUS,
-                            to_char(L.LOG_TIME, 'DD/MM/YYYY HH24:MI') AS LOG_TIME
-                     FROM LOG_ACTIVITY L
-                     LEFT JOIN USERS U ON L.USER_ID = U.USER_ID
-                     ORDER BY L.LOG_TIME DESC`;
+        // แก้ไข SQL เป็นตัวพิมพ์เล็กให้ตรงกับ Database
+        const sql = `SELECT l.log_id, l.user_id, u.username, l.action, l.client_ip, l.status,
+                            to_char(l.log_time, 'DD/MM/YYYY HH24:MI') AS formatted_time
+                     FROM log_activity l
+                     LEFT JOIN users u ON l.user_id = u.user_id
+                     ORDER BY l.log_time DESC`;
                      
         const result = await client.query(sql);
-        // แปลง Key กลับเป็นตัวพิมพ์ใหญ่ให้หน้าเว็บอ่านออก
+        
+        // แปลงกลับเป็นตัวพิมพ์ใหญ่ เพื่อให้หน้าเว็บ dashboard.html ดึงไปใช้ได้ (หน้าเว็บรอรับตัวพิมพ์ใหญ่อยู่)
         const logs = result.rows.map(row => {
             return {
                 LOG_ID: row.log_id,
@@ -107,7 +117,7 @@ app.get('/all-logs', async (req, res) => {
                 ACTION: row.action,
                 CLIENT_IP: row.client_ip,
                 STATUS: row.status,
-                LOG_TIME: row.log_time
+                LOG_TIME: row.formatted_time
             };
         });
 
@@ -125,11 +135,13 @@ app.delete('/delete-log/:id', async (req, res) => {
     const client = await pool.connect();
 
     if (dept !== 'admin') {
+        client.release();
         return res.status(403).json({ status: 'error', message: 'เฉพาะ Admin เท่านั้นที่มีสิทธิ์ลบ' });
     }
 
     try {
-        const result = await client.query(`DELETE FROM LOG_ACTIVITY WHERE LOG_ID = $1`, [logId]);
+        // แก้ไข SQL เป็นตัวพิมพ์เล็กให้ตรงกับ Database
+        const result = await client.query(`DELETE FROM log_activity WHERE log_id = $1`, [logId]);
 
         if (result.rowCount > 0) {
             return res.json({ status: 'success', message: 'ลบข้อมูลสำเร็จ' });
@@ -148,10 +160,11 @@ app.get('/all-users', async (req, res) => {
     const client = await pool.connect();
 
     try {
-        const sql = `SELECT USER_ID, USERNAME, DEPARTMENT FROM USERS ORDER BY USER_ID`;
+        // แก้ไข SQL เป็นตัวพิมพ์เล็กให้ตรงกับ Database
+        const sql = `SELECT user_id, username, department FROM users ORDER BY user_id`;
         const result = await client.query(sql);
 
-        // 🌟 แก้ไขตรงนี้: แปลงข้อมูลจาก PostgreSQL (พิมพ์เล็ก) ให้เป็นพิมพ์ใหญ่ส่งไปให้หน้าบ้าน
+        // แปลงกลับเป็นตัวพิมพ์ใหญ่ เพื่อให้หน้าเว็บรับข้อมูลไปแสดงในตารางได้
         const users = result.rows.map(row => ({
             USER_ID: row.user_id,
             USERNAME: row.username,
