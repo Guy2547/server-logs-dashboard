@@ -1,0 +1,184 @@
+const express = require('express');
+const { Pool } = require('pg');
+const cors = require('cors');
+const path = require('path');
+const dotenv = require('dotenv');
+
+dotenv.config();
+
+const app = express();
+
+const projectRoot = path.join(__dirname, '..');
+
+app.use(cors());
+app.use(express.json());
+app.use(express.static(projectRoot));
+
+// Environment-specific configuration
+const config = {
+  development: {
+    port: process.env.PORT ? parseInt(process.env.PORT, 10) : 3000,
+    database: {
+      connectionString: process.env.DATABASE_URL,
+      host: process.env.DB_HOST,
+      port: process.env.DB_PORT ? parseInt(process.env.DB_PORT, 10) : undefined,
+      user: process.env.DB_USER,
+      password: process.env.DB_PASSWORD,
+      database: process.env.DB_NAME,
+      ssl: process.env.DB_SSL === 'true',
+      max: process.env.DB_POOL_MAX ? parseInt(process.env.DB_POOL_MAX, 10) : undefined,
+      idleTimeoutMillis: process.env.DB_IDLE_TIMEOUT_MS ? parseInt(process.env.DB_IDLE_TIMEOUT_MS, 10) : undefined
+    }
+  }
+};
+
+const env = process.env.NODE_ENV || 'development';
+const currentConfig = config[env] || config.development;
+const appConfig = {
+  apiBaseUrl: (process.env.API_BASE_URL || '').trim().replace(/\/$/, ''),
+  serverLabel: (process.env.SERVER_LABEL || 'Server Logs API').trim()
+};
+
+const pool = new Pool(currentConfig.database);
+
+app.locals.port = currentConfig.port;
+app.locals.env = env;
+
+function getClientIp(req) {
+  return req.headers['x-forwarded-for']?.split(',')[0].trim() || req.socket?.remoteAddress || req.ip || '127.0.0.1';
+}
+
+app.get('/app-config.js', (req, res) => {
+  res.type('application/javascript');
+  return res.send(`window.APP_CONFIG = ${JSON.stringify(appConfig)};`);
+});
+
+// --- Login API ---
+app.post('/login', async (req, res) => {
+  const { USER_ID, PASSWORD } = req.body;
+  const client = await pool.connect();
+  const clientIp = getClientIp(req);
+  const loginTime = new Date().toLocaleString('th-TH', { timeZone: 'Asia/Bangkok' });
+
+  if (isNaN(USER_ID)) {
+    client.release();
+    return res.status(400).json({ status: 'error', message: 'USER ID ต้องเป็นตัวเลขเท่านั้น' });
+  }
+
+  const ipRegex = /^(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/;
+  if (clientIp && !ipRegex.test(clientIp) && clientIp !== '::1') {
+    client.release();
+    return res.status(400).json({ message: 'รูปแบบ IP Address ไม่ถูกต้อง' });
+  }
+
+  try {
+    const authSql = `SELECT username, department FROM users WHERE user_id = $1 AND password = $2 AND status = 'ACTIVE'`;
+    const authResult = await client.query(authSql, [USER_ID, PASSWORD]);
+
+    if (authResult.rows.length > 0) {
+      const { username, department } = authResult.rows[0];
+      await client.query(
+        `INSERT INTO log_activity (user_id, action, client_ip, status, log_time) VALUES ($1, $2, $3, $4, NOW())`,
+        [USER_ID, 'LOGIN_SUCCESS', clientIp, 'SUCCESS']
+      );
+
+      return res.json({
+        status: 'success',
+        user: { id: USER_ID, name: username, dept: department },
+        session: { ip: clientIp, loginTime }
+      });
+    }
+
+    const idResult = await client.query(`SELECT username FROM users WHERE user_id = $1`, [USER_ID]);
+    await client.query(
+      `INSERT INTO log_activity (user_id, action, client_ip, status, log_time) VALUES ($1, $2, $3, $4, NOW())`,
+      [USER_ID, 'LOGIN_FAILED', clientIp, idResult.rows.length > 0 ? 'FAIL' : 'NOT_FOUND']
+    );
+
+    if (idResult.rows.length === 0) {
+      return res.status(404).json({ status: 'error', message: 'ไอดีคุณไม่มีในฐานข้อมูล' });
+    }
+
+    return res.status(401).json({ status: 'error', message: 'รหัสผ่านไม่ถูกต้อง' });
+  } catch (err) {
+    return res.status(500).json({ status: 'error', message: err.message });
+  } finally {
+    client.release();
+  }
+});
+
+// --- Logs API ---
+app.get('/all-logs', async (req, res) => {
+  const client = await pool.connect();
+  try {
+    const sql = `SELECT l.log_id, l.user_id, u.username, l.action, l.client_ip, l.status,
+                        to_char(l.log_time, 'DD/MM/YYYY HH24:MI') AS formatted_time
+                 FROM log_activity l
+                 LEFT JOIN users u ON l.user_id = u.user_id
+                 ORDER BY l.log_time DESC`;
+
+    const result = await client.query(sql);
+    const logs = result.rows.map((row) => ({
+      LOG_ID: row.log_id,
+      USER_ID: row.user_id,
+      USERNAME: row.username || 'Unknown',
+      ACTION: row.action,
+      CLIENT_IP: row.client_ip,
+      STATUS: row.status,
+      LOG_TIME: row.formatted_time
+    }));
+
+    return res.status(200).json(logs);
+  } catch (err) {
+    return res.status(500).json({ status: 'error', message: err.message });
+  } finally {
+    client.release();
+  }
+});
+
+app.delete('/delete-log/:id', async (req, res) => {
+  const logId = req.params.id;
+  const { dept } = req.body;
+  const client = await pool.connect();
+
+  if (dept !== 'admin') {
+    client.release();
+    return res.status(403).json({ status: 'error', message: 'เฉพาะ Admin เท่านั้นที่มีสิทธิ์ลบ' });
+  }
+
+  try {
+    const result = await client.query(`DELETE FROM log_activity WHERE log_id = $1`, [logId]);
+    if (result.rowCount > 0) {
+      return res.json({ status: 'success', message: 'ลบข้อมูลสำเร็จ' });
+    }
+    return res.status(404).json({ status: 'error', message: 'ไม่พบข้อมูลที่ต้องการลบ' });
+  } catch (err) {
+    return res.status(500).json({ status: 'error', message: err.message });
+  } finally {
+    client.release();
+  }
+});
+
+app.get('/all-users', async (req, res) => {
+  const client = await pool.connect();
+  try {
+    const sql = `SELECT user_id, username, department FROM users ORDER BY user_id`;
+    const result = await client.query(sql);
+    const users = result.rows.map((row) => ({
+      USER_ID: row.user_id,
+      USERNAME: row.username,
+      DEPARTMENT: row.department
+    }));
+    return res.status(200).json(users);
+  } catch (err) {
+    return res.status(500).json({ status: 'error', message: err.message });
+  } finally {
+    client.release();
+  }
+});
+
+app.get('/', (req, res) => {
+  res.sendFile(path.join(projectRoot, 'index.html'));
+});
+
+module.exports = app;

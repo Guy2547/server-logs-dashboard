@@ -5,7 +5,7 @@
   "main": "API GET.js",
   "scripts": {
     "test": "echo 'ALL TESTS PASSED!'",
-    "start": "npm start"
+    "start": "node backend/server.js"
   },
   "keywords": [],
   "author": "",
