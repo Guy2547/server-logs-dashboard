@@ -169,14 +169,11 @@
             loginBtn.disabled = true;
 
             try {
-                // แก้ไข URL เป็น Ngrok และเพิ่ม Header ข้ามหน้าจอแจ้งเตือน
                 const res = await axios.post('https://josephina-untallied-superoratorically.ngrok-free.dev/login', {
                     USER_ID: userId,
                     PASSWORD: password
                 }, {
-                    headers: {
-                        'ngrok-skip-browser-warning': 'true'
-                    }
+                    headers: { 'ngrok-skip-browser-warning': 'true' }
                 });
                 
                 const data = res.data;
