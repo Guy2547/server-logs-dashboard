@@ -169,11 +169,9 @@
             loginBtn.disabled = true;
 
             try {
-                const res = await axios.post('https://josephina-untallied-superoratorically.ngrok-free.dev/login', {
+                const res = await axios.post('postgres-production-bf23.up.railway.app', {
                     USER_ID: userId,
                     PASSWORD: password
-                }, {
-                    headers: { 'ngrok-skip-browser-warning': 'true' }
                 });
                 
                 const data = res.data;
