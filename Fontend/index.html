@@ -185,10 +185,7 @@
                 loginBtn.style.backgroundColor = '#22c55e';
                 loginBtn.innerText = 'เข้าสู่ระบบสำเร็จ! กำลังเปลี่ยนหน้า...';
                 
-                setTimeout(() => {
-                    window.location.href = 'dashboard.html';
-                }, 500);
-
+        
                 setTimeout(() => {
                     const dept = data.user.dept.toLowerCase();
                     if(dept === 'admin' || dept === 'hr') {
