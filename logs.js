@@ -101,10 +101,10 @@ app.get('/all-logs', async (req, res) => {
     try {
         client = await pool.connect();
         const sql = `SELECT l.log_id, l.user_id, u.username, l.action, l.client_ip, l.status,
-                            to_char(l.log_time, 'DD/MM/YYYY HH24:MI') AS formatted_time
-                     FROM log_activity l
-                     LEFT JOIN users u ON l.user_id = u.user_id
-                     ORDER BY l.log_time DESC`;
+                                         to_char(l.log_time + interval '7 hours', 'DD/MM/YYYY HH24:MI') AS formatted_time
+                                  FROM log_activity l
+                                  LEFT JOIN users u ON l.user_id = u.user_id
+                                  ORDER BY l.log_time DESC`;
                      
         const result = await client.query(sql);
 
