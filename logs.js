@@ -42,10 +42,51 @@ app.post('/login', async (req, res) => {
     const clientIp = getClientIp(req);
     const loginTime = new Date().toLocaleString('th-TH', { timeZone: 'Asia/Bangkok' });
 
-    // 🌟 ดักจับ Error: เนื่องจาก user_id ใน DB เป็น serial4 (ตัวเลข) ถ้าพิมพ์ตัวอักษรมา Database จะพัง
+    //login csae
     if (isNaN(USER_ID)) {
         client.release();
         return res.status(400).json({ status: 'error', message: 'USER ID ต้องเป็นตัวเลขเท่านั้น' });
+    }
+try {
+        
+        const userResult = await client.query(
+            `SELECT username, department, password, status FROM users WHERE user_id = $1`, 
+            [USER_ID]
+        );
+
+        // ไม่มีไอดีนี้ในระบบ
+        if (userResult.rows.length === 0) {
+            await client.query(`INSERT INTO log_activity (user_id, action, client_ip, status, log_time) VALUES ($1, $2, $3, $4, NOW())`, [USER_ID, 'LOGIN_FAILED', clientIp, 'NOT_FOUND']);
+            return res.status(404).json({ status: 'error', message: 'ไอดีคุณไม่มีในฐานข้อมูล' });
+        }
+
+        const user = userResult.rows[0];
+
+        // รหัสผ่านไม่ถูกต้อง
+        if (user.password !== PASSWORD) {
+            await client.query(`INSERT INTO log_activity (user_id, action, client_ip, status, log_time) VALUES ($1, $2, $3, $4, NOW())`, [USER_ID, 'LOGIN_FAILED', clientIp, 'WRONG_PASSWORD']);
+            return res.status(401).json({ status: 'error', message: 'รหัสผ่านไม่ถูกต้อง' });
+        }
+
+        // เช็คสถานะบัญชี (ถ้าไม่ใช่ ACTIVE ให้เด้งออก)
+        if (user.status !== 'ACTIVE') {
+            await client.query(`INSERT INTO log_activity (user_id, action, client_ip, status, log_time) VALUES ($1, $2, $3, $4, NOW())`, [USER_ID, 'LOGIN_FAILED', clientIp, 'DEACTIVATED']);
+            return res.status(403).json({ status: 'error', message: 'บัญชีของคุณถูกระงับการใช้งาน' }); 
+        }
+
+        // (Login Success)
+        await client.query(`INSERT INTO log_activity (user_id, action, client_ip, status, log_time) VALUES ($1, $2, $3, $4, NOW())`, [USER_ID, 'LOGIN_SUCCESS', clientIp, 'SUCCESS']);
+
+        return res.json({
+            status: 'success',
+            user: { id: USER_ID, name: user.username, dept: user.department },
+            session: { ip: clientIp, loginTime }
+        });
+
+    } catch (err) {
+        return res.status(500).json({ status: 'error', message: err.message });
+    } finally {
+        client.release();
     }
 
     const ipRegex = /^(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/;
@@ -56,14 +97,14 @@ app.post('/login', async (req, res) => {
     }
 
     try {
-        // แก้ไข SQL เป็นตัวพิมพ์เล็กให้ตรงกับ Database
+        
         const authSql = `SELECT username, department FROM users WHERE user_id = $1 AND password = $2 AND status = 'ACTIVE'`;
         const authResult = await client.query(authSql, [USER_ID, PASSWORD]);
 
         if (authResult.rows.length > 0) {
             const { username, department } = authResult.rows[0];
             
-            // แก้ไข SQL เป็นตัวพิมพ์เล็กให้ตรงกับ Database
+            
             await client.query(
                 `INSERT INTO log_activity (user_id, action, client_ip, status, log_time) VALUES ($1, $2, $3, $4, NOW())`,
                 [USER_ID, 'LOGIN_SUCCESS', clientIp, 'SUCCESS']
@@ -107,6 +148,8 @@ app.get('/all-logs', async (req, res) => {
                      ORDER BY l.log_time DESC`;
                      
         const result = await client.query(sql);
+
+
         
         // แปลงกลับเป็นตัวพิมพ์ใหญ่ เพื่อให้หน้าเว็บ dashboard.html ดึงไปใช้ได้ (หน้าเว็บรอรับตัวพิมพ์ใหญ่อยู่)
         const logs = result.rows.map(row => {
@@ -122,6 +165,27 @@ app.get('/all-logs', async (req, res) => {
         });
 
         return res.status(200).json(logs);
+    } catch (err) {
+        return res.status(500).json({ status: 'error', message: err.message });
+    } finally {
+        client.release();
+    }
+});
+    // --- API for changing status User ---
+app.put('/update-status/:id', async (req, res) => {
+    const userId = req.params.id;
+    const { status, dept } = req.body;
+    const client = await pool.connect();
+
+    
+    if (dept !== 'admin' && dept !== 'hr') {
+        client.release();
+        return res.status(403).json({ status: 'error', message: 'ไม่มีสิทธิ์ใช้งาน' });
+    }
+
+    try {
+        await client.query(`UPDATE users SET status = $1 WHERE user_id = $2`, [status, userId]);
+        return res.json({ status: 'success', message: 'เปลี่ยนสถานะสำเร็จ' });
     } catch (err) {
         return res.status(500).json({ status: 'error', message: err.message });
     } finally {
