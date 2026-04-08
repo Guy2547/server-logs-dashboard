@@ -7,6 +7,7 @@
     <meta charset="UTF-8">
     <title>Database Explorer - Management System</title>
     <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+     <script src="/app-config.js"></script>
     <style>
         .loading-overlay {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
@@ -156,6 +157,15 @@
     <script>
         const userName = localStorage.getItem('u_name');
         const userDept = localStorage.getItem('u_dept');
+        
+        const serverLabel = window.APP_CONFIG?.serverLabel || 'Server Logs API';
+
+        function buildApiUrl(path) {
+            const baseUrl = window.APP_CONFIG?.apiBaseUrl || '';
+            return `${baseUrl}${path}`;
+        }
+
+        document.querySelector('.meta-pill').innerText = `SERVER: ${serverLabel}`;
 
         if (!userName) {
             window.location.href = 'index.html';
@@ -237,8 +247,7 @@
             setTableHeaders(['ลำดับ', 'USER_ID', 'USERNAME', 'ACTION', 'CLIENT_IP', 'STATUS', 'LOG_TIME', 'CONTROL']);
             document.getElementById('queryStatus').innerHTML = `-- Executing: SELECT ... FROM LOG_ACTIVITY...`;
 
-            axios.get('https://server-logs-dashboard-production.up.railway.app/all-logs', {
-            })
+            axios.get(buildApiUrl('/all-logs'))
                 .then(res => {
                     const data = res.data; 
                     document.getElementById('queryStatus').innerHTML = `-- Executing: SELECT l.log_id, l.user_id, u.username, l.action, l.client_ip, l.status, to_char(l.log_time, 'DD/MM/YYYY HH24:MI') AS formatted_time FROM log_activity l LEFT JOIN users u ON l.user_id = u.user_id ORDER BY l.log_time DESC;<br>-- Fetched <span style="color:var(--primary)">${data.length}</span> rows.`;
@@ -275,7 +284,7 @@
             setTableHeaders(['USER_ID', 'USERNAME', 'DEPARTMENT', 'STATUS', 'จัดการสิทธิ์']);
             document.getElementById('queryStatus').innerHTML = `-- Executing: SELECT user_id, username, department FROM users ORDER BY user_id;`;
 
-            axios.get('https://server-logs-dashboard-production.up.railway.app/all-users')
+            axios.get(buildApiUrl('/all-users'))
                 .then(res => {
                     const data = res.data; 
                     document.getElementById('queryStatus').innerHTML = `-- Executing: SELECT user_id, username, department FROM users ORDER BY user_id;<br>-- Fetched <span style="color:var(--primary)">${data.length}</span> rows.`;
@@ -320,7 +329,7 @@
             if (!confirm(`ยืนยันการลบข้อมูล LOG_ID: ${logId} ใช่หรือไม่?`)) return;
 
             try {
-                await axios.delete(`https://server-logs-dashboard-production.up.railway.app/delete-log/${logId}`, {
+                 const res = await axios.delete(buildApiUrl(`/delete-log/${logId}`), {
                     data: { dept: userDept },
                 });
 

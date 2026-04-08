@@ -4,6 +4,7 @@ const cors = require('cors');
 const app = express();
 const dotenv = require('dotenv');
 const rateLimit = require('express-rate-limit');
+const app = require('./backend/app');
 dotenv.config();
 
 app.use(limiter);
