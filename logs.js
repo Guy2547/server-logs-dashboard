@@ -10,6 +10,14 @@ app.use(limiter);
 app.use(cors());
 app.use(express.json());
 
+const limiter = rateLimit({
+    windowMs: 15 * 60 * 1000, 
+    max: 100, 
+    message: { status: 'error', message: 'คุณพยายามเข้าสู่ระบบบ่อยเกินไป กรุณารอ 15 นาทีแล้วลองใหม่' },
+    standardHeaders: true, 
+    legacyHeaders: false,
+});
+
 // Environment-specific configuration
 const config = {
   development: {
@@ -37,13 +45,6 @@ function getClientIp(req) {
     return req.headers['x-forwarded-for']?.split(',')[0].trim() || req.socket?.remoteAddress || req.ip || '127.0.0.1';
 }
 
-const limiter = rateLimit({
-    windowMs: 15 * 60 * 1000, 
-    max: 100, 
-    message: { status: 'error', message: 'คุณพยายามเข้าสู่ระบบบ่อยเกินไป กรุณารอ 15 นาทีแล้วลองใหม่' },
-    standardHeaders: true, 
-    legacyHeaders: false, 
-});
 
 // --- Login API ---
 app.post('/login', limiter, async (req, res) => {
