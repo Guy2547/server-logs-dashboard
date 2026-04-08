@@ -7,6 +7,16 @@ const rateLimit = require('express-rate-limit');
 dotenv.config();
 const app = express();
 
+// CORS
+app.use(cors({
+    origin: '*', // ยอมรับทุกหน้าเว็บ
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization']
+}));
+
+app.use(express.json());
+
+//   (Rate Limit)
 const limiter = rateLimit({
     windowMs: 15 * 60 * 1000, 
     max: 100, 
@@ -14,11 +24,8 @@ const limiter = rateLimit({
     standardHeaders: true, 
     legacyHeaders: false,
 });
-
-
 app.use(limiter);
-app.use(cors());
-app.use(express.json()); // สำคัญมาก: ตัวอ่านข้อมูลจากหน้าเว็บ
+
 
 const pool = new Pool({
     connectionString: process.env.DATABASE_URL,
@@ -116,7 +123,7 @@ app.get('/all-logs', async (req, res) => {
     }
 });
 
-// --- API for changing status User ---
+// --- API Change Status User ---
 app.put('/update-status/:id', async (req, res) => {
     const userId = req.params.id;
     const { status, dept } = req.body;
