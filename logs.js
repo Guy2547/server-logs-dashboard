@@ -7,13 +7,17 @@ const rateLimit = require('express-rate-limit');
 dotenv.config();
 const app = express();
 
-// 1. เปิด CORS แบบครอบจักรวาล (ป้องกันเบราว์เซอร์บล็อก)
-app.use(cors());
+app.set('trust proxy', 1);
 
-// 2. ตัวอ่าน JSON
+app.use(cors({
+    origin: '*',
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization']
+}));
+
+// JSON
 app.use(express.json());
 
-// 3. ยามรักษาความปลอดภัย
 const limiter = rateLimit({
     windowMs: 15 * 60 * 1000, 
     max: 100, 
