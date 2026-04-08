@@ -169,7 +169,7 @@
             loginBtn.disabled = true;
 
             try {
-                const res = await axios.post(`${process.env.Database}/login`, {
+                const res = await axios.post('https://server-logs-dashboard-production.up.railway.app/login', {
                     USER_ID: userId,
                     PASSWORD: password
                 });
@@ -199,11 +199,13 @@
                         showError("❌ ไม่พบ USER ID นี้ในระบบ");
                     } else if (error.response.status === 401) {
                         showError("❌ รหัสผ่านไม่ถูกต้อง กรุณาลองใหม่อีกครั้ง");
+                    } else if (error.response.status === 403) {
+                        showError("❌ บัญชีของคุณถูกระงับการใช้งาน");
                     } else {
                         showError("⚠️ เกิดข้อผิดพลาดจากเซิร์ฟเวอร์");
                     }
                 } else {
-                    showError("🔌 ไม่สามารถเชื่อมต่อฐานข้อมูลได้ (ตรวจสอบ Node.js และ Ngrok)");
+                    showError("🔌 ไม่สามารถเชื่อมต่อฐานข้อมูลได้ ");
                 }
             }
         }
