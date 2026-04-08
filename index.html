@@ -169,7 +169,6 @@
             loginBtn.disabled = true;
 
             try {
-                // ดึงลิงก์จากไฟล์ config.js มาใช้
                 const res = await axios.post(`${CONFIG.API_URL}/login`, {
                     USER_ID: userId,
                     PASSWORD: password

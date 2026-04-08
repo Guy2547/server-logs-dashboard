@@ -137,8 +137,7 @@
                 <div style="max-height: 60vh; overflow-y: auto;">
                     <table>
                         <thead id="tableHeader">
-                            <tr>
-                                </tr>
+                            <tr></tr>
                         </thead>
                         <tbody id="tableBody"></tbody>
                     </table>
@@ -157,7 +156,6 @@
         const userName = localStorage.getItem('u_name');
         const userDept = localStorage.getItem('u_dept');
         
-        // ใส่ชื่อเซิร์ฟเวอร์จากไฟล์ config.js
         document.getElementById('serverLabelText').innerText = CONFIG.SERVER_LABEL;
 
         if (!userName) {
@@ -167,18 +165,14 @@
             document.getElementById('uName').innerText = userName;
             const dept = userDept.toLowerCase();
 
-            // ให้สิทธิ์ทั้ง admin และ hr เข้ามาได้
             if (dept === 'admin' || dept === 'hr') {
                 document.getElementById('adminPanel').style.display = 'block';
                 
                 if (dept === 'hr') {
-                    // ถ้าเป็น HR ให้ซ่อนปุ่มเมนู Log และ System ทิ้งไปเลย
                     document.querySelector('[data-view="logs"]').style.display = 'none';
                     document.querySelector('[data-view="system"]').style.display = 'none';
-                    // และบังคับคลิกเปิดหน้า USERS ทันทีที่เข้ามา
                     setTimeout(() => document.querySelector('[data-view="users"]').click(), 100);
                 } else {
-                    // ถ้าเป็น Admin ให้เปิดหน้า Log เป็นค่าเริ่มต้น
                     loadLogs(); 
                 }
                 
@@ -240,7 +234,6 @@
             setTableHeaders(['ลำดับ', 'USER_ID', 'USERNAME', 'ACTION', 'CLIENT_IP', 'STATUS', 'LOG_TIME', 'CONTROL']);
             document.getElementById('queryStatus').innerHTML = `-- Executing: SELECT ... FROM LOG_ACTIVITY...`;
 
-            // ดึงลิงก์จากไฟล์ config.js มาใช้
             axios.get(`${CONFIG.API_URL}/all-logs`)
                 .then(res => {
                     const data = res.data; 
@@ -279,7 +272,6 @@
             setTableHeaders(['USER_ID', 'USERNAME', 'DEPARTMENT', 'STATUS', 'จัดการสิทธิ์']);
             document.getElementById('queryStatus').innerHTML = `-- Executing: SELECT user_id, username, department, status FROM users ORDER BY user_id;`;
 
-            // ดึงลิงก์จากไฟล์ config.js มาใช้
             axios.get(`${CONFIG.API_URL}/all-users`)
                 .then(res => {
                     const data = res.data; 
@@ -290,7 +282,6 @@
                         const tr = document.createElement('tr');
                         const statusColor = row.STATUS === 'ACTIVE' ? '#22c55e' : '#ef4444';
                         
-                        // Dropdown สำหรับเปลี่ยนสถานะ
                         const actionHtml = `
                             <select onchange="changeUserStatus('${row.USER_ID}', this.value)" style="padding: 6px; border-radius: 6px; background: rgba(15, 23, 42, 0.9); color: white; border: 1px solid var(--primary); cursor: pointer; font-family: inherit;">
                                 <option value="ACTIVE" ${row.STATUS === 'ACTIVE' ? 'selected' : ''}>ACTIVE</option>
@@ -314,15 +305,13 @@
                 });
         }
 
-        // ฟังก์ชันสั่งเปลี่ยนสถานะ (รวบให้เหลืออันเดียวแล้ว)
         async function changeUserStatus(userId, newStatus) {
             if (!confirm(`ยืนยันการเปลี่ยนสถานะของไอดี ${userId} เป็น ${newStatus} ใช่หรือไม่?`)) {
-                loadUsers(); // ถ้ายกเลิก ให้โหลดตารางใหม่เพื่อคืนค่า Dropdown เดิม
+                loadUsers(); 
                 return;
             }
 
             try {
-                // ดึงลิงก์จากไฟล์ config.js มาใช้
                 await axios.put(`${CONFIG.API_URL}/update-status/${userId}`, {
                     status: newStatus,
                     dept: userDept
@@ -340,7 +329,6 @@
             if (!confirm(`ยืนยันการลบข้อมูล LOG_ID: ${logId} ใช่หรือไม่?`)) return;
 
             try {
-                 // ดึงลิงก์จากไฟล์ config.js มาใช้
                  const res = await axios.delete(`${CONFIG.API_URL}/delete-log/${logId}`, {
                     data: { dept: userDept },
                 });
