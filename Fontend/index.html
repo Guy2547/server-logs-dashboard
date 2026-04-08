@@ -189,6 +189,15 @@
                     window.location.href = 'dashboard.html';
                 }, 500);
 
+                setTimeout(() => {
+                    const dept = data.user.dept.toLowerCase();
+                    if(dept === 'admin' || dept === 'hr') {
+                        window.location.href = 'dashboard.html';
+                    } else {
+                        window.location.href = 'welcome.html';
+                    }
+                }, 500);
+
             } catch (error) {
                 loginBtn.innerText = 'เข้าสู่ระบบ';
                 loginBtn.disabled = false;
