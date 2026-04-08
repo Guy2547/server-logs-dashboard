@@ -7,7 +7,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@300;400;500;600&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
-    <script src="/app-config.js"></script>
+    <script src="config.js"></script> 
     <style>
         :root {
             --bg: #0f172a;
@@ -114,7 +114,7 @@
 <body>
 
     <div class="login-card">
-        <h2>เข้าสู่ระบบdata707</h2>
+        <h2>เข้าสู่ระบบ data707</h2>
         <p>กรุณาใส่ข้อมูลประจำตัวเพื่อเข้าสู่ระบบจัดการบันทึกเซิร์ฟเวอร์</p>
 
         <div id="errorMessage" class="error-message"></div>
@@ -133,11 +133,6 @@
     </div>
 
     <script>
-         function buildApiUrl(path) {
-            const baseUrl = window.APP_CONFIG?.apiBaseUrl || '';
-            return `${baseUrl}${path}`;
-        }
-
         document.addEventListener('DOMContentLoaded', () => {
             if (localStorage.getItem('u_name') && localStorage.getItem('u_dept')) {
                 window.location.href = 'dashboard.html';
@@ -174,7 +169,8 @@
             loginBtn.disabled = true;
 
             try {
-                const res = await axios.post(buildApiUrl('/login'), {
+                // ดึงลิงก์จากไฟล์ config.js มาใช้
+                const res = await axios.post(`${CONFIG.API_URL}/login`, {
                     USER_ID: userId,
                     PASSWORD: password
                 });
@@ -190,7 +186,6 @@
                 loginBtn.style.backgroundColor = '#22c55e';
                 loginBtn.innerText = 'เข้าสู่ระบบสำเร็จ! กำลังเปลี่ยนหน้า...';
                 
-            
                 setTimeout(() => {
                     window.location.href = 'dashboard.html';
                 }, 500);
