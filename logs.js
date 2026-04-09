@@ -36,11 +36,6 @@ function getClientIp(req) {
     return req.headers['x-forwarded-for']?.split(',')[0].trim() || req.socket?.remoteAddress || req.ip || '127.0.0.1';
 }
 
-// 🌟 [ของใหม่] หน้าทดสอบระบบ ถ้าเปิดเว็บแล้วเห็นข้อความนี้แปลว่าเซิร์ฟเวอร์ทำงาน 100%
-app.get('/', (req, res) => {
-    res.send('✅ API is Online and CORS is working perfectly!');
-});
-
 // --- Login API ---
 app.post('/login', async (req, res) => {
     const { USER_ID, PASSWORD } = req.body;
@@ -51,7 +46,6 @@ app.post('/login', async (req, res) => {
     }
 
     try {
-        // 🌟 ย้ายการเชื่อมต่อฐานข้อมูลเข้ามาอยู่ในตาข่ายนิรภัย (Try) ถ้าพัง เซิร์ฟเวอร์ก็จะไม่ดับ!
         client = await pool.connect();
         const clientIp = getClientIp(req);
         const loginTime = new Date().toLocaleString('th-TH', { timeZone: 'Asia/Bangkok' });
@@ -87,7 +81,7 @@ app.post('/login', async (req, res) => {
         });
 
     } catch (err) {
-        // ถ้าฐานข้อมูลมีปัญหา จะเด้งมาที่นี่แทนการพัง
+        // ฐานข้อมูลมีปัญหา จะเด้งมาที่นี่แทนการพัง
         console.error("Database Error:", err);
         return res.status(500).json({ status: 'error', message: 'ไม่สามารถเชื่อมต่อฐานข้อมูลได้: ' + err.message });
     } finally {
