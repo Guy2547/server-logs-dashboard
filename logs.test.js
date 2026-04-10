@@ -1,6 +1,6 @@
 require('dotenv').config();
 const request = require('supertest');
-const app = require('./logs'); // ดึงไฟล์เซิร์ฟเวอร์ของเรามาเทสต์
+const app = require('./app'); // ดึงไฟล์เซิร์ฟเวอร์ของเรามาเทสต์
 
 
 describe('🧪 ทดสอบระบบ Login API', () => {
@@ -39,7 +39,7 @@ describe('🧪 ทดสอบระบบ Login API', () => {
                 USER_ID: '103', 
                 PASSWORD: '1234' 
             });
-
+            //TODO เปลี่ยน เป็น MOCK ใช่ต่อกับฐานข้อมูลจริงเพื่อทดสอบเคสนี้ได้ถูกต้อง
        expect(response.statusCode).toBe(403);
                expect(response.body).toHaveProperty('message', 'บัญชีของคุณถูกระงับการใช้งาน'); 
     });

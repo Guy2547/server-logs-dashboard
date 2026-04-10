@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const pool = require('../config/db');
 
-// --- API All Users ---
+//  API All Users 
 router.get('/all-users', async (req, res) => {
     let client;
     try {
@@ -25,7 +25,7 @@ router.get('/all-users', async (req, res) => {
     }
 });
 
-// --- API Change Status User ---
+// API Change Status User 
 router.put('/update-status/:id', async (req, res) => {
     const userId = req.params.id;
     const { status, dept } = req.body;
@@ -46,5 +46,4 @@ router.put('/update-status/:id', async (req, res) => {
     }
 });
 
-// 🌟 บรรทัดนี้สำคัญที่สุด ห้ามหายเด็ดขาด! 🌟
 module.exports = router;

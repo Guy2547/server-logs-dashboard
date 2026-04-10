@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const pool = require('../config/db');
 
-// ดึงประวัติทั้งหมด
+// GETlogsทั้งหมด
 router.get('/all-logs', async (req, res) => {
     let client;
     try {
