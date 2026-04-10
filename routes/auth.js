@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const pool = require('../config/db');
+const bcrypt = require('bcrypt');
 
 function getClientIp(req) {
     return req.headers['x-forwarded-for']?.split(',')[0].trim() || req.socket?.remoteAddress || req.ip || '127.0.0.1';
@@ -30,8 +31,9 @@ router.post('/login', async (req, res) => {
         }
 
         const user = userResult.rows[0];
+        const isMatch = await bcrypt.compare(PASSWORD, user.password);
 
-        if (user.password !== PASSWORD) {
+        if (!isMatch) {
             await client.query(`INSERT INTO log_activity (user_id, action, client_ip, status, log_time) VALUES ($1, $2, $3, $4, NOW())`, [USER_ID, 'LOGIN_FAILED', clientIp, 'WRONG_PASSWORD']);
             return res.status(401).json({ status: 'error', message: 'รหัสผ่านไม่ถูกต้อง' });
         }
