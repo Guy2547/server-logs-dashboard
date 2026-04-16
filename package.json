@@ -4,7 +4,7 @@
   "description": "",
   "main": "app.js",
   "scripts": {
-    "test": "echo'ALL TESTS PASSED'", 
+    "test": "jest --forceExit",
     "start": "node app.js"
   },
   "keywords": [],
