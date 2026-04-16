@@ -34,7 +34,7 @@ console.log("👉 เช็คไฟล์ auth:", typeof authRoutes);
 console.log("👉 เช็คไฟล์ users:", typeof usersRoutes);
 console.log("👉 เช็คไฟล์ logs:", typeof logsRoutes);
 
-// งานเส้นทาง API
+// งานเส้นทาง APIฝั่งเซิร์ฟเวอร์ /////////
 app.use('/', authRoutes);
 app.use('/', usersRoutes);
 app.use('/', logsRoutes);
