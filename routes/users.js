@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const pool = require('../config/db');
 
-//  API All Users 
+// API All Users 
 router.get('/all-users', async (req, res) => {
     let client;
     try {
@@ -31,7 +31,10 @@ router.put('/update-status/:id', async (req, res) => {
     const { status, dept } = req.body;
     let client;
 
-    if (dept !== 'admin' && dept !== 'hr') {
+    // 🌟 จุดที่แก้: แปลงเป็นตัวพิมพ์เล็กก่อน เพื่อป้องกันบั๊กเวลาส่ง 'HR' หรือ 'Admin' มา
+    const userRole = dept ? dept.toLowerCase() : '';
+
+    if (userRole !== 'admin' && userRole !== 'hr') {
         return res.status(403).json({ status: 'error', message: 'ไม่มีสิทธิ์ใช้งาน' });
     }
 
