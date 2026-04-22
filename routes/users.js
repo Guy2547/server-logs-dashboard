@@ -31,7 +31,7 @@ router.put('/update-status/:id', async (req, res) => {
     const { status, dept } = req.body;
     let client;
 
-    // 🌟 จุดที่แก้: แปลงเป็นตัวพิมพ์เล็กก่อน เพื่อป้องกันบั๊กเวลาส่ง 'HR' หรือ 'Admin' มา
+    //  เพื่อป้องกันบั๊กเวลาส่ง 'HR' หรือ 'Admin' มา
     const userRole = dept ? dept.toLowerCase() : '';
 
     if (userRole !== 'admin' && userRole !== 'hr') {
