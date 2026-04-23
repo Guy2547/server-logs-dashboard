@@ -6,57 +6,41 @@ const pool = require('../config/db');
 router.get('/all-logs', async (req, res) => {
     let client;
     try {
-        client = await pool.connect();
-        const sql = `SELECT l.log_id, l.user_id, u.username, l.action, l.client_ip, l.status,
-                     to_char(l.log_time + interval '7 hours', 'DD/MM/YYYY HH24:MI') AS formatted_time
-                     FROM log_activity l
-                     LEFT JOIN users u ON l.user_id = u.user_id
-                     ORDER BY l.log_time DESC`;
-                     
-        const result = await client.query(sql);
+        const { search, date, status } = req.query;
+        
+        let query = 'SELECT * FROM log_activity WHERE 1=1';
+        let values = [];
+        let valueIndex = 1;
 
-        const logs = result.rows.map(row => ({
-            LOG_ID: row.log_id,
-            USER_ID: row.user_id,
-            USERNAME: row.username || 'Unknown',
-            ACTION: row.action,
-            CLIENT_IP: row.client_ip,
-            STATUS: row.status,
-            LOG_TIME: row.formatted_time
-        }));
-
-        return res.status(200).json(logs);
-    } catch (err) {
-        return res.status(500).json({ status: 'error', message: err.message });
-    } finally {
-        if (client) client.release();
-    }
-});
-
-// ลบประวัติ
-router.delete('/delete-log/:id', async (req, res) => {
-    const logId = req.params.id;
-    const { dept } = req.body;
-    let client;
-
-    if (dept !== 'admin') {
-        return res.status(403).json({ status: 'error', message: 'เฉพาะ Admin เท่านั้นที่มีสิทธิ์ลบ' });
-    }
-
-    try {
-        client = await pool.connect();
-        const result = await client.query(`DELETE FROM log_activity WHERE log_id = $1`, [logId]);
-
-        if (result.rowCount > 0) {
-            return res.json({ status: 'success', message: 'ลบข้อมูลสำเร็จ' });
+        // ถ้ามีการพิมพ์ค้นหา ID หรือ ชื่อ
+        if (search) {
+            query += ` AND (user_id ILIKE $${valueIndex} OR username ILIKE $${valueIndex})`;
+            values.push(`%${search}%`);
+            valueIndex++;
         }
 
-        return res.status(404).json({ status: 'error', message: 'ไม่พบข้อมูลที่ต้องการลบ' });
+        // ถ้ามีการเลือกวันที่
+        if (date) {
+            query += ` AND DATE(log_time) = $${valueIndex}`;
+            values.push(date);
+            valueIndex++;
+        }
+
+        // ถ้ามีการเลือกสถานะ
+        if (status) {
+            query += ` AND status = $${valueIndex}`;
+            values.push(status);
+            valueIndex++;
+        }
+
+        query += ' ORDER BY log_time DESC'; // เรียงจากล่าสุดไปเก่าสุด
+
+        const result = await pool.query(query, values);
+        res.json(result.rows);
+        
     } catch (err) {
-        return res.status(500).json({ status: 'error', message: err.message });
-    } finally {
-        if (client) client.release();
+        console.error(err.message);
+        res.status(500).json({ error: 'ไม่สามารถดึงข้อมูลจากฐานข้อมูลได้' });
     }
 });
-
 module.exports = router;
