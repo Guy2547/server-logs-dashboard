@@ -6,10 +6,7 @@ const rateLimit = require('express-rate-limit');
 const authRoutes = require('./routes/auth');
 const usersRoutes = require('./routes/users');
 const logsRoutes = require('./routes/logs');
-const helmet = require('helmet');
 
-
-app.use(helmet());
 dotenv.config();
 const app = express();
 
