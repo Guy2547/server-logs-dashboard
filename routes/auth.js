@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const pool = require('../config/db');
 const bcrypt = require('bcrypt');
+const io = req.app.get('io');
 
 function getClientIp(req) {
     return req.headers['x-forwarded-for']?.split(',')[0].trim() || req.socket?.remoteAddress || req.ip || '127.0.0.1';
@@ -57,6 +58,8 @@ router.post('/login', async (req, res) => {
     } finally {
         if (client) client.release();
     }
+
+    io.emit('new-log', { message: 'มีเหตุการณ์ใหม่เกิดขึ้น!' });
 });
 
 module.exports = router;

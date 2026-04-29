@@ -3,12 +3,27 @@ const cors = require('cors');
 const dotenv = require('dotenv');
 const bcrypt = require('bcrypt'); 
 const rateLimit = require('express-rate-limit');
+const { createServer } = require('http'); // 🌟 เพิ่มตัวสร้าง HTTP Server
+const { Server } = require('socket.io'); // 🌟 เพิ่ม Socket.io
+
 const authRoutes = require('./routes/auth');
 const usersRoutes = require('./routes/users');
 const logsRoutes = require('./routes/logs');
 
 dotenv.config();
 const app = express();
+
+// 🌟 สร้าง HTTP Server และ Socket.io
+const httpServer = createServer(app);
+const io = new Server(httpServer, {
+    cors: {
+        origin: '*',
+        methods: ['GET', 'POST']
+    }
+});
+
+// 🌟 ส่งตัว io ไปที่ app เพื่อให้ routes อื่นๆ เรียกใช้ได้ (ใช้ req.app.get('io'))
+app.set('io', io);
 
 app.set('trust proxy', 1);
 
@@ -29,21 +44,25 @@ const limiter = rateLimit({
 });
 app.use(limiter);
 
-console.log("👉 เช็คไฟล์ auth:", typeof authRoutes);
-console.log("👉 เช็คไฟล์ users:", typeof usersRoutes);
-console.log("👉 เช็คไฟล์ logs:", typeof logsRoutes);
+// 🌟 จัดการการเชื่อมต่อ Socket
+io.on('connection', (socket) => {
+    console.log('⚡ มีคนเชื่อมต่อ Socket แล้ว ID:', socket.id);
+    
+    socket.on('disconnect', () => {
+        console.log('❌ การเชื่อมต่อ Socket หลุด');
+    });
+});
 
-// งานเส้นทาง APIฝั่งเซิร์ฟเวอร์ /////////
 app.use('/', authRoutes);
 app.use('/', usersRoutes);
 app.use('/', logsRoutes);
 
-// เปิด Server 
+// 🌟 เปลี่ยนจาก app.listen เป็น httpServer.listen
 if (require.main === module) {
     const PORT = process.env.PORT || 3000;
-    app.listen(PORT, '0.0.0.0', () => {
-        console.log(`🚀 Server running on port ${PORT}`);
+    httpServer.listen(PORT, '0.0.0.0', () => {
+        console.log(`🚀 Server + Real-time Socket running on port ${PORT}`);
     });
 }
 
-module.exports = app;
+module.exports = { app, httpServer }; // ส่งออกทั้งคู่
