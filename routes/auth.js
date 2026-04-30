@@ -2,6 +2,8 @@ const express = require('express');
 const router = express.Router();
 const pool = require('../config/db');
 const bcrypt = require('bcrypt');
+const fs = require('fs'); 
+const path = require('path'); 
 
 /**
  * ฟังก์ชันช่วยดึง IP Address
@@ -12,6 +14,20 @@ function getClientIp(req) {
            req.ip || 
            '127.0.0.1';
 }
+
+     const logUnknownUser = (userId, clientIp) => {
+ 
+      const logFilePath = path.join(__dirname, '../logs/unauthorized_access.log'); 
+     const timestamp = new Date().toLocaleString('th-TH'); // เวลาไทย
+ 
+ 
+     const logEntry = `[${timestamp}] ID: ${userId} | IP: ${clientIp} | Status: NOT_FOUND_IN_DB\n`;
+ // เขียนต่อท้ายไฟล์เดิม (ถ้าไม่มีไฟล์จะสร้างให้เอง)
+ fs.appendFile(logFilePath, logEntry, (err) => {
+     if (err) console.error("📝 บันทึกลงไฟล์ล้มเหลว:", err);
+ });
+ };
+
 
 /**
  * API: Login
@@ -76,6 +92,18 @@ router.post('/login', async (req, res) => {
             return res.status(403).json({ status: 'error', message: 'บัญชีของคุณถูกระงับการใช้งาน' }); 
         }
 
+        if (userResult.rows.length === 0) {
+            console.log("❌ User not found in DB");
+    
+            const clientIp = getClientIp(req);
+    
+            // 🌟 เรียกใช้ฟังก์ชันบันทึกข้อมูลลงไฟล์
+             logUnknownUser(USER_ID, clientIp); 
+
+            if (io) io.emit('new-log');
+            return res.status(404).json({ status: 'error', message: 'ไอดีคุณไม่มีในฐานข้อมูล' });
+}
+
         // --- กรณีที่ 4: Login สำเร็จ (ไม้ตายสุดท้าย) ---
         console.log(`📝 บันทึก Log สำเร็จสำหรับ: ${user.username}`);
         
@@ -92,6 +120,8 @@ router.post('/login', async (req, res) => {
             )`, 
             [USER_ID, clientIp]
         );
+        
+
 
         // ส่งสัญญาณ Real-time บอก Dashboard
         if (io) {
