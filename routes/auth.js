@@ -21,7 +21,7 @@ router.post('/login', async (req, res) => {
     const io = req.app.get('io'); 
     let client;
 
-    console.log(`--- Login Attempt for ID: ${USER_ID} ---`);
+    console.log(`--- 🚀 Login Attempt for ID: ${USER_ID} ---`);
 
     if (!USER_ID || isNaN(USER_ID)) {
         return res.status(400).json({ status: 'error', message: 'USER ID ต้องเป็นตัวเลขเท่านั้น' });
@@ -31,14 +31,15 @@ router.post('/login', async (req, res) => {
         client = await pool.connect();
         const clientIp = getClientIp(req);
 
-        // 1. ดึงข้อมูลจากตาราง users (เช็คชื่อคอลัมน์ให้ดีว่า username หรือ USERNAME)
+        // 1. ตรวจสอบข้อมูลผู้ใช้งานก่อน
         const userResult = await client.query(
             'SELECT username, department, password, status FROM users WHERE user_id = $1', 
             [USER_ID]
         );
 
+        // --- กรณีที่ 1: ไม่พบไอดี ---
         if (userResult.rows.length === 0) {
-            console.log("❌ User not found in DB");
+            console.log("❌ User not found");
             await client.query(
                 'INSERT INTO log_activity (user_id, username, action, client_ip, status, log_time) VALUES ($1, $2, $3, $4, $5, NOW())', 
                 [USER_ID, '-', 'LOGIN_FAILED', clientIp, 'NOT_FOUND']
@@ -48,40 +49,53 @@ router.post('/login', async (req, res) => {
         }
 
         const user = userResult.rows[0];
-        console.log("✅ Found User:", user.username); // เช็คใน Logs Railway ว่าชื่อขึ้นไหม
-
         const isMatch = await bcrypt.compare(PASSWORD, user.password);
 
+        // --- กรณีที่ 2: รหัสผ่านผิด ---
         if (!isMatch) {
-            console.log("❌ Password Mismatch");
-            await client.query(
-                'INSERT INTO log_activity (user_id, username, action, client_ip, status, log_time) VALUES ($1, $2, $3, $4, $5, NOW())', 
-                [USER_ID, user.username, 'LOGIN_FAILED', clientIp, 'WRONG_PASSWORD']
+            console.log(`❌ Password Mismatch for: ${user.username}`);
+            // 🌟 ใช้ Subquery ดึงชื่อมาใส่เพื่อความชัวร์
+            await client.query(`
+                INSERT INTO log_activity (user_id, username, action, client_ip, status, log_time) 
+                VALUES ($1, (SELECT username FROM users WHERE user_id = $1), $2, $3, $4, NOW())`, 
+                [USER_ID, 'LOGIN_FAILED', clientIp, 'WRONG_PASSWORD']
             );
             if (io) io.emit('new-log');
             return res.status(401).json({ status: 'error', message: 'รหัสผ่านไม่ถูกต้อง' });
         }
 
+        // --- กรณีที่ 3: บัญชีโดนแบน ---
         if (user.status !== 'ACTIVE') {
-            console.log("❌ User is Deactivated");
-            await client.query(
-                'INSERT INTO log_activity (user_id, username, action, client_ip, status, log_time) VALUES ($1, $2, $3, $4, $5, NOW())', 
-                [USER_ID, user.username, 'LOGIN_FAILED', clientIp, 'DEACTIVATED']
+            console.log(`❌ Account Deactivated: ${user.username}`);
+            await client.query(`
+                INSERT INTO log_activity (user_id, username, action, client_ip, status, log_time) 
+                VALUES ($1, (SELECT username FROM users WHERE user_id = $1), $2, $3, $4, NOW())`, 
+                [USER_ID, 'LOGIN_FAILED', clientIp, 'DEACTIVATED']
             );
             if (io) io.emit('new-log');
             return res.status(403).json({ status: 'error', message: 'บัญชีของคุณถูกระงับการใช้งาน' }); 
         }
 
-        // 2. บันทึก Login สำเร็จ พร้อม Username
-        console.log(`📝 Saving Log for: ${user.username}`);
-        await client.query(
-            'INSERT INTO log_activity (user_id, username, action, client_ip, status, log_time) VALUES ($1, $2, $3, $4, $5, NOW())', 
-            [USER_ID, user.username, 'LOGIN_SUCCESS', clientIp, 'SUCCESS']
+        // --- กรณีที่ 4: Login สำเร็จ (ไม้ตายสุดท้าย) ---
+        console.log(`📝 บันทึก Log สำเร็จสำหรับ: ${user.username}`);
+        
+        // 🌟 บังคับให้ DB ดึงชื่อจากตาราง users มาใส่ใน log_activity โดยตรง
+        await client.query(`
+            INSERT INTO log_activity (user_id, username, action, client_ip, status, log_time) 
+            VALUES (
+                $1, 
+                (SELECT username FROM users WHERE user_id = $1), 
+                'LOGIN_SUCCESS', 
+                $2, 
+                'SUCCESS', 
+                NOW()
+            )`, 
+            [USER_ID, clientIp]
         );
 
-        // 3. ส่งสัญญาณ Real-time
+        // ส่งสัญญาณ Real-time บอก Dashboard
         if (io) {
-            console.log("📣 Socket: Emitting new-log");
+            console.log("📣 Socket: ส่งสัญญาณอัปเดตหน้า Dashboard");
             io.emit('new-log');
         }
 
@@ -91,8 +105,8 @@ router.post('/login', async (req, res) => {
         });
 
     } catch (err) {
-        console.error("🔥 Error in /login:", err.message);
-        return res.status(500).json({ status: 'error', message: 'Server Error' });
+        console.error("🔥 Server Error:", err.message);
+        return res.status(500).json({ status: 'error', message: 'Server Error: ' + err.message });
     } finally {
         if (client) client.release();
     }
