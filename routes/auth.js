@@ -38,14 +38,16 @@ router.post('/login', async (req, res) => {
         const userResult = await client.query(`
             SELECT
                 u.username,
+                u.first_name,   -- ✅ ดึง first_name มาด้วย
+                u.last_name,
                 u.password,
                 u.status,
                 ARRAY_AGG(r.role_name) FILTER (WHERE r.role_name IS NOT NULL) AS department
             FROM users u
             LEFT JOIN user_roles ur ON u.user_id  = ur.user_id
-            LEFT JOIN roles r       ON ur.role_id = r.role_id   -- ✅ แก้: role → role_id
+            LEFT JOIN roles r       ON ur.role_id = r.role_id
             WHERE u.user_id = $1
-            GROUP BY u.user_id, u.username, u.password, u.status
+            GROUP BY u.user_id, u.username, u.first_name, u.last_name, u.password, u.status
         `, [USER_ID]);
 
         // กรณีที่ 1: ไม่พบ ID
@@ -61,14 +63,18 @@ router.post('/login', async (req, res) => {
         }
 
         const user    = userResult.rows[0];
+
+        // ✅ ใช้ first_name เป็น display name ถ้ามี ไม่งั้น fallback เป็น username
+        const displayName = user.first_name || user.username;
+
         const isMatch = await bcrypt.compare(PASSWORD, user.password);
 
         // กรณีที่ 2: รหัสผ่านผิด
         if (!isMatch) {
-            console.log(`❌ Password Mismatch for: ${user.username}`);
+            console.log(`❌ Password Mismatch for: ${displayName}`);
             await client.query(
                 'INSERT INTO log_activity (user_id, username, action, client_ip, status, log_time) VALUES ($1,$2,$3,$4,$5,NOW())',
-                [USER_ID, user.username, 'LOGIN_FAILED', clientIp, 'WRONG_PASSWORD']
+                [USER_ID, displayName, 'LOGIN_FAILED', clientIp, 'WRONG_PASSWORD']  // ✅ บันทึก first_name
             );
             if (io) io.emit('new-log');
             return res.status(401).json({ status: 'error', message: 'รหัสผ่านไม่ถูกต้อง' });
@@ -76,19 +82,20 @@ router.post('/login', async (req, res) => {
 
         // กรณีที่ 3: บัญชีถูกระงับ
         if (user.status !== 'ACTIVE') {
-            console.log(`❌ Account Deactivated: ${user.username}`);
+            console.log(`❌ Account Deactivated: ${displayName}`);
             await client.query(
                 'INSERT INTO log_activity (user_id, username, action, client_ip, status, log_time) VALUES ($1,$2,$3,$4,$5,NOW())',
-                [USER_ID, user.username, 'LOGIN_FAILED', clientIp, 'DEACTIVATED']
+                [USER_ID, displayName, 'LOGIN_FAILED', clientIp, 'DEACTIVATED']  // ✅ บันทึก first_name
             );
             if (io) io.emit('new-log');
             return res.status(403).json({ status: 'error', message: 'บัญชีของคุณถูกระงับการใช้งาน' });
         }
 
         // กรณีที่ 4: Login สำเร็จ
+        console.log(`✅ Login Success: ${displayName}`);
         await client.query(
             'INSERT INTO log_activity (user_id, username, action, client_ip, status, log_time) VALUES ($1,$2,$3,$4,$5,NOW())',
-            [USER_ID, user.username, 'LOGIN_SUCCESS', clientIp, 'SUCCESS']
+            [USER_ID, displayName, 'LOGIN_SUCCESS', clientIp, 'SUCCESS']  // ✅ บันทึก first_name
         );
         if (io) io.emit('new-log');
 
@@ -96,8 +103,8 @@ router.post('/login', async (req, res) => {
             status: 'success',
             user: {
                 id   : USER_ID,
-                name : user.username,
-                dept : user.department || []   // Array of role_name strings
+                name : displayName,       
+                dept : user.department || []
             }
         });
 
