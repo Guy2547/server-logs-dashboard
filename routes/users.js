@@ -41,14 +41,11 @@ router.get('/all-users', async (req, res) => {
 });
 
 // ── GET /api/users/roles ──────────────────────
-// ดึง roles ทั้งหมดจาก DB สำหรับ dropdown
 router.get('/roles', async (req, res) => {
     let client;
     try {
         client = await pool.connect();
-        const { rows } = await client.query(
-            'SELECT role_id, role_name FROM roles ORDER BY role_id'
-        );
+        const { rows } = await client.query('SELECT role_id, role_name FROM roles ORDER BY role_id');
         return res.status(200).json(rows);
     } catch (err) {
         console.error('[GET /roles]', err.message);
@@ -63,40 +60,67 @@ router.post('/add', async (req, res) => {
     const { userId, firstName, lastName, password, roleId } = req.body;
 
     if (!userId || !firstName || !lastName || !password || !roleId) {
-        return res.status(400).json({
-            status: 'error',
-            message: 'กรุณาระบุ userId, firstName, lastName, password และ roleId'
-        });
+        return res.status(400).json({ status: 'error', message: 'กรุณาระบุ userId, firstName, lastName, password และ roleId' });
     }
 
-    // สร้าง username อัตโนมัติจาก first_name + last_name
     const username = `${firstName} ${lastName}`.trim();
-
     let client;
     try {
         client = await pool.connect();
         await client.query('BEGIN');
-
         const hashedPassword = await bcrypt.hash(String(password), 10);
-
         await client.query(
             `INSERT INTO users (user_id, first_name, last_name, username, password, status)
              VALUES ($1, $2, $3, $4, $5, 'ACTIVE')`,
             [userId, firstName, lastName, username, hashedPassword]
         );
-        await client.query(
-            'INSERT INTO user_roles (user_id, role_id) VALUES ($1, $2)',
-            [userId, roleId]
-        );
-
+        await client.query('INSERT INTO user_roles (user_id, role_id) VALUES ($1, $2)', [userId, roleId]);
         await client.query('COMMIT');
         return res.status(201).json({ status: 'success', message: 'เพิ่มพนักงานเรียบร้อย' });
-
     } catch (err) {
         if (client) await client.query('ROLLBACK');
         console.error('[POST /add]', err.message);
         if (err.code === '23505') return res.status(409).json({ status: 'error', message: 'userId นี้มีในระบบแล้ว' });
         if (err.code === '23503') return res.status(400).json({ status: 'error', message: `roleId "${roleId}" ไม่มีในระบบ` });
+        return res.status(500).json({ status: 'error', message: err.message });
+    } finally {
+        if (client) client.release();
+    }
+});
+
+// ── PUT /api/users/update-user/:userId ────────
+// แก้ไขชื่อ นามสกุล และ/หรือ role
+router.put('/update-user/:userId', async (req, res) => {
+    const { userId }                  = req.params;
+    const { firstName, lastName, roleId } = req.body;
+
+    if (!firstName || !lastName) {
+        return res.status(400).json({ status: 'error', message: 'กรุณาระบุ firstName และ lastName' });
+    }
+
+    const username = `${firstName} ${lastName}`.trim();
+    let client;
+    try {
+        client = await pool.connect();
+        await client.query('BEGIN');
+
+        // อัปเดต users table
+        await client.query(
+            'UPDATE users SET first_name=$1, last_name=$2, username=$3 WHERE user_id=$4',
+            [firstName, lastName, username, userId]
+        );
+
+        // ถ้าส่ง roleId มาด้วย → อัปเดต role
+        if (roleId) {
+            await client.query('DELETE FROM user_roles WHERE user_id=$1', [userId]);
+            await client.query('INSERT INTO user_roles (user_id, role_id) VALUES ($1, $2)', [userId, roleId]);
+        }
+
+        await client.query('COMMIT');
+        return res.json({ status: 'success', message: 'แก้ไขข้อมูลเรียบร้อย' });
+    } catch (err) {
+        if (client) await client.query('ROLLBACK');
+        console.error('[PUT /update-user]', err.message);
         return res.status(500).json({ status: 'error', message: err.message });
     } finally {
         if (client) client.release();
@@ -115,13 +139,8 @@ router.put('/update-status/:userId', async (req, res) => {
     let client;
     try {
         client = await pool.connect();
-        const result = await client.query(
-            'UPDATE users SET status = $1 WHERE user_id = $2',
-            [status, userId]
-        );
-        if (result.rowCount === 0) {
-            return res.status(404).json({ status: 'error', message: 'ไม่พบ user นี้ในระบบ' });
-        }
+        const result = await client.query('UPDATE users SET status=$1 WHERE user_id=$2', [status, userId]);
+        if (result.rowCount === 0) return res.status(404).json({ status: 'error', message: 'ไม่พบ user นี้' });
         return res.json({ status: 'success', message: 'อัปเดตสถานะเรียบร้อย' });
     } catch (err) {
         console.error('[PUT /update-status]', err.message);
