@@ -9,7 +9,7 @@ router.get('/logs', async (req, res) => {
     try {
         const { search, date, status } = req.query;
         
-        // 🌟 ตั้งชื่อ Alias ให้เป็นตัวพิมพ์ใหญ่ เพื่อให้ตรงกับ Frontend
+        // 🌟 ใช้ Alias ตัวพิมพ์ใหญ่ให้ตรงกับที่ Frontend คาดหวัง
         let query = `
             SELECT 
                 log_id AS "id", 
@@ -25,21 +25,18 @@ router.get('/logs', async (req, res) => {
         let values = [];
         let valueIndex = 1;
 
-        // ฟิลเตอร์: ค้นหาด้วย ID หรือ ชื่อ
         if (search) {
             query += ` AND (CAST(user_id AS TEXT) ILIKE $${valueIndex} OR username ILIKE $${valueIndex})`;
             values.push(`%${search}%`);
             valueIndex++;
         }
 
-        // ฟิลเตอร์: วันที่ (YYYY-MM-DD)
         if (date) {
             query += ` AND DATE(log_time) = $${valueIndex}`;
             values.push(date);
             valueIndex++;
         }
 
-        // ฟิลเตอร์: สถานะ (SUCCESS, FAILED, etc.)
         if (status) {
             query += ` AND status = $${valueIndex}`;
             values.push(status);
@@ -50,7 +47,7 @@ router.get('/logs', async (req, res) => {
 
         const result = await pool.query(query, values);
 
-        // 🌟 ส่งกลับเป็น Object ตามมาตรฐานที่หน้าบ้านต้องการ
+        // 🌟 ส่งกลับเป็น Object มาตรฐาน (เพื่อให้ loadLogs ในหน้าบ้านทำงานได้)
         return res.status(200).json({
             status: 'success',
             data: result.rows
