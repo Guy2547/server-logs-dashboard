@@ -1,18 +1,18 @@
-const express = require('express');
-const cors = require('cors');
-const dotenv = require('dotenv');
-const rateLimit = require('express-rate-limit');
+const express    = require('express');
+const cors       = require('cors');
+const dotenv     = require('dotenv');
+const rateLimit  = require('express-rate-limit');
 const { createServer } = require('http');
-const { Server } = require('socket.io');
+const { Server }       = require('socket.io');
 
 const authRoutes  = require('./routes/auth');
 const usersRoutes = require('./routes/users');
 const logsRoutes  = require('./routes/logs');
+const verifyToken = require('./middleware/auth');   // ✅ JWT Middleware
 
 dotenv.config();
 const app = express();
 
-// ── HTTP Server + Socket.io ───────────────────
 const httpServer = createServer(app);
 const io = new Server(httpServer, {
     cors: { origin: '*', methods: ['GET', 'POST'] }
@@ -20,36 +20,34 @@ const io = new Server(httpServer, {
 app.set('io', io);
 app.set('trust proxy', 1);
 
-// ── Middleware ────────────────────────────────
 app.use(cors({
     origin: '*',
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization']
+    allowedHeaders: ['Content-Type', 'Authorization']   // ✅ อนุญาต Authorization header
 }));
 app.use(express.json());
 
 const limiter = rateLimit({
-    windowMs: 15 * 60 * 1000,
-    max: 100,
+    windowMs: 15 * 60 * 1000, max: 100,
     message: { status: 'error', message: 'คุณพยายามเข้าสู่ระบบบ่อยเกินไป' },
-    standardHeaders: true,
-    legacyHeaders: false,
+    standardHeaders: true, legacyHeaders: false,
 });
 app.use(limiter);
 
-// ── Socket ────────────────────────────────────
 io.on('connection', (socket) => {
     console.log('⚡ Socket connected:', socket.id);
     socket.on('disconnect', () => console.log('❌ Socket disconnected'));
 });
 
 // ── Routes ────────────────────────────────────
-// ✅ แก้: mount แยก prefix ให้ตรงกับที่ Frontend เรียก
-app.use('/',          authRoutes);   // POST /login
-app.use('/api/users', usersRoutes);  // GET  /api/users/all-users, POST /api/users/add
-app.use('/api/logs',  logsRoutes);   // GET  /api/logs/logs
+// /login ไม่ต้องมี token (Public route)
+app.use('/', authRoutes);
 
-// ── Start ─────────────────────────────────────
+// ✅ /api/* ต้องมี token ทุก request (Protected routes)
+// verifyToken จะทำงานก่อน usersRoutes และ logsRoutes เสมอ
+app.use('/api/users', verifyToken, usersRoutes);
+app.use('/api/logs',  verifyToken, logsRoutes);
+
 if (require.main === module) {
     const PORT = process.env.PORT || 3000;
     httpServer.listen(PORT, '0.0.0.0', () => {
