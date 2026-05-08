@@ -71,10 +71,11 @@ router.post('/add', async (req, res) => {
 });
 
 // ── PUT /api/users/update-user/:userId ────────
-// รองรับ roleIds เป็น Array (หลาย role)
 router.put('/update-user/:userId', async (req, res) => {
-    const { userId }                       = req.params;
-    const { firstName, lastName, roleIds } = req.body;   // roleIds = Array เช่น [1, 2]
+    const { userId } = req.params;
+    
+    // 🌟 แก้ตรงนี้: เปลี่ยนจาก roleIds เป็น roleId (ไม่มี s) เพื่อให้ตรงกับหน้าบ้าน
+    const { firstName, lastName, roleId } = req.body;
 
     if (!firstName || !lastName)
         return res.status(400).json({ status: 'error', message: 'กรุณาระบุ firstName และ lastName' });
@@ -90,10 +91,10 @@ router.put('/update-user/:userId', async (req, res) => {
             [firstName, lastName, username, userId]
         );
 
-        // ถ้าส่ง roleIds มาและไม่ใช่ Array ว่าง → อัปเดต role
-        if (Array.isArray(roleIds) && roleIds.length > 0) {
+        // 🌟 แก้ตรงนี้: เปลี่ยนมาใช้ roleId
+        if (Array.isArray(roleId) && roleId.length > 0) {
             await client.query('DELETE FROM user_roles WHERE user_id=$1', [userId]);
-            for (const rId of roleIds) {
+            for (const rId of roleId) {
                 await client.query('INSERT INTO user_roles (user_id, role_id) VALUES ($1,$2)', [userId, rId]);
             }
         }
