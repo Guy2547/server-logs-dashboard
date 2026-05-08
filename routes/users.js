@@ -73,11 +73,23 @@ router.post('/add', async (req, res) => {
 // ── PUT /api/users/update-user/:userId ────────
 router.put('/update-user/:userId', async (req, res) => {
     const { userId } = req.params;
-    // รับ roleId (Array) ให้ตรงกับหน้าบ้าน
-    const { firstName, lastName, roleId } = req.body;
+    const { firstName, lastName, roleId, role_id, dept } = req.body;
 
     if (!firstName || !lastName)
         return res.status(400).json({ status: 'error', message: 'กรุณาระบุ firstName และ lastName' });
+
+    const normalizeRoleIds = (value) => {
+        if (value == null) return undefined;
+        if (Array.isArray(value)) return value;
+        return [value];
+    };
+
+    let roleIds = normalizeRoleIds(roleId) || normalizeRoleIds(role_id) || normalizeRoleIds(dept);
+    if (roleIds !== undefined) {
+        roleIds = roleIds
+            .map((r) => Number(r))
+            .filter((r) => !Number.isNaN(r));
+    }
 
     const username = `${firstName} ${lastName}`.trim();
     let client;
@@ -91,13 +103,10 @@ router.put('/update-user/:userId', async (req, res) => {
             [firstName, lastName, username, userId]
         );
 
-        // 2. อัปเดตสิทธิ์ (Roles)
-        if (Array.isArray(roleId)) {
-            // ลบสิทธิ์เดิมออกทั้งหมดก่อน
+        // 2. อัปเดตสิทธิ์ (Roles) เฉพาะเมื่อส่ง role มา
+        if (roleIds !== undefined) {
             await client.query('DELETE FROM user_roles WHERE user_id=$1', [userId]);
-            
-            // บันทึกสิทธิ์ใหม่ตามที่ส่งมาใน Array (ถ้าส่งมาว่างเปล่า ก็จะเป็นการล้างสิทธิ์)
-            for (const rId of roleId) {
+            for (const rId of roleIds) {
                 await client.query('INSERT INTO user_roles (user_id, role_id) VALUES ($1,$2)', [userId, rId]);
             }
         }

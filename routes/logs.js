@@ -2,9 +2,6 @@ const express = require('express');
 const router = express.Router();
 const pool = require('../config/db');
 
-/**
- * 📊 API: ดึงประวัติการใช้งานระบบ (GET /api/logs/logs)
- */
 router.get('/logs', async (req, res) => {
     try {
         const { search, date, status } = req.query;
