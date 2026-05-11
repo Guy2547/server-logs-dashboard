@@ -3,6 +3,7 @@ const router  = express.Router();
 const pool    = require('../config/db');
 const bcrypt  = require('bcrypt');
 const jwt     = require('jsonwebtoken');   // ✅ เพิ่ม JWT
+const crypto  = require('crypto');
 const fs      = require('fs');
 const path    = require('path');
 
@@ -87,6 +88,9 @@ router.post('/login', async (req, res) => {
 
         // กรณีที่ 4: Login สำเร็จ → สร้าง JWT
         const userRoles = user.department || [];
+        const tokenId = typeof crypto.randomUUID === 'function'
+            ? crypto.randomUUID()
+            : `login-${USER_ID}-${Date.now()}`;
 
         // ✅ jwt.sign() — ใส่ข้อมูลที่ต้องการลงใน token
         // Payload ที่อยู่ใน token (ใครก็อ่านได้ ห้ามใส่ password)
@@ -98,7 +102,10 @@ router.post('/login', async (req, res) => {
                 ip      : clientIp,           // IP ตอน login
             },
             JWT_SECRET,                       // ลายเซ็น server
-            { expiresIn: JWT_EXPIRES }        // หมดอายุ 8 ชม.
+            {
+                expiresIn: JWT_EXPIRES,       // หมดอายุ 8 ชม.
+                jwtid: tokenId,               // บังคับไม่ให้ token ซ้ำกัน
+            }
         );
 
         await client.query(

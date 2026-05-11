@@ -2,7 +2,7 @@ const express = require('express');
 const router  = express.Router();
 const pool    = require('../config/db');
 const bcrypt  = require('bcrypt');
-const verifyToken = require('../middleware/auth');
+const { verifyToken, verifyAdmin } = require('../middleware/auth');
 
 // ── GET /api/users/all-users ──────────────────
 router.get('/all-users', verifyToken, async (req, res) => {
@@ -44,7 +44,7 @@ router.get('/roles', verifyToken, async (req, res) => {
 });
 
 // ── POST /api/users/add ───────────────────────
-router.post('/add', verifyToken, async (req, res) => {
+router.post('/add', verifyToken, verifyAdmin, async (req, res) => {
     const { userId, firstName, lastName, password, roleId } = req.body;
     if (!userId || !firstName || !lastName || !password || !roleId)
         return res.status(400).json({ status: 'error', message: 'กรุณาระบุข้อมูลให้ครบ' });
@@ -72,7 +72,7 @@ router.post('/add', verifyToken, async (req, res) => {
 });
 
 // ── PUT /api/users/update-user/:userId ────────
-router.put('/update-user/:userId', verifyToken, async (req, res) => {
+router.put('/update-user/:userId', verifyToken, verifyAdmin, async (req, res) => {
     const { userId } = req.params;
     const { firstName, lastName, roleId, role_id, dept } = req.body;
 
@@ -125,7 +125,7 @@ router.put('/update-user/:userId', verifyToken, async (req, res) => {
 });
 
 // ── PUT /api/users/update-status/:userId ──────
-router.put('/update-status/:userId', verifyToken, async (req, res) => {
+router.put('/update-status/:userId', verifyToken, verifyAdmin, async (req, res) => {
     const { userId } = req.params;
     const { status }  = req.body;
     if (!['ACTIVE','DEACTIVATED'].includes(status))
