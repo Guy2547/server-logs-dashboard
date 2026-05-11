@@ -1,7 +1,7 @@
 require('dotenv').config();
 const request = require('supertest');
-const app = require('./app'); 
-const bcrypt = require('bcrypt'); 
+const { app } = require('./app');
+const bcrypt = require('bcrypt');
 
 // 🌟 1. อัปเกรด Mock ให้ครอบคลุมทั้งการใช้ pool.query และ pool.connect
 jest.mock('pg', () => {

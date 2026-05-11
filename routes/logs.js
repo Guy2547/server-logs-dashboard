@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const pool = require('../config/db');
 
-router.get('/logs', async (req, res) => {
+router.get('/', async (req, res) => {
     try {
         const { search, date, status } = req.query;
         

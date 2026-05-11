@@ -98,10 +98,14 @@ router.put('/update-user/:userId', async (req, res) => {
         await client.query('BEGIN');
 
         // 1. อัปเดตข้อมูลพื้นฐาน
-        await client.query(
+        const updateResult = await client.query(
             'UPDATE users SET first_name=$1, last_name=$2, username=$3 WHERE user_id=$4',
             [firstName, lastName, username, userId]
         );
+        if (updateResult.rowCount === 0) {
+            await client.query('ROLLBACK');
+            return res.status(404).json({ status: 'error', message: 'ไม่พบ user นี้' });
+        }
 
         // 2. อัปเดตสิทธิ์ (Roles) เฉพาะเมื่อส่ง role มา
         if (roleIds !== undefined) {
