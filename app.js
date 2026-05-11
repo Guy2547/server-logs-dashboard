@@ -60,14 +60,12 @@ io.on('connection', (socket) => {
 });
 
 // ── Routes ────────────────────────────────────
-// Public — ไม่ต้องมี token (วางก่อน!)
+// Public — ไม่ต้องมี token
 app.use('/', authRoutes);
-app.use('/api/users/verify-identity', usersRoutes);
-app.use('/api/users/reset-password',  usersRoutes);
+app.use('/api/users', usersRoutes);
 
-// Protected — ต้องมี token (วางทีหลัง!)
-app.use('/api/users', verifyToken, usersRoutes);
-app.use('/api/logs',  verifyToken, logsRoutes);
+// Protected — ต้องมี token
+app.use('/api/logs', verifyToken, logsRoutes);
 
 if (require.main === module) {
     const PORT = process.env.PORT || 3000;
