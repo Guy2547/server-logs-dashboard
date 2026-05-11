@@ -10,7 +10,7 @@ router.get('/all-users', async (req, res) => {
         client = await pool.connect();
         const { rows } = await client.query(`
             SELECT u.user_id, u.first_name, u.last_name, u.username, u.status,
-                ARRAY_AGG(r.role_name) FILTER (WHERE r.role_name IS NOT NULL) AS department
+            ARRAY_AGG(r.role_name) FILTER (WHERE r.role_name IS NOT NULL) AS department
             FROM users u
             LEFT JOIN user_roles ur ON u.user_id  = ur.user_id
             LEFT JOIN roles r       ON ur.role_id = r.role_id

@@ -60,14 +60,12 @@ io.on('connection', (socket) => {
 });
 
 // ── Routes ────────────────────────────────────
-// Public — ไม่ต้องมี token
+// Public — ไม่ต้องมี token (วางก่อน!)
 app.use('/', authRoutes);
-
-// ✅ verify-identity และ reset-password ไม่ต้อง token (ใช้ตอนลืมรหัส)
 app.use('/api/users/verify-identity', usersRoutes);
 app.use('/api/users/reset-password',  usersRoutes);
 
-// Protected — ต้องมี token
+// Protected — ต้องมี token (วางทีหลัง!)
 app.use('/api/users', verifyToken, usersRoutes);
 app.use('/api/logs',  verifyToken, logsRoutes);
 
